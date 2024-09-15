@@ -1,6 +1,6 @@
 import componentmanager
 from component import Component
-from reactor import cstr_SingleLiqPhase
+from reactor import CstrSingleLiqPhase
 from reactions import *
 from flow import *
 from proptiesmethod import *
@@ -52,28 +52,27 @@ reaction_set_1.source_define(10, [9, 15], [1, 1], [1, 1], True)
 reaction_set_1.source_define(11, [0, 7], [1, 1], [1, 1], False)
 reaction_set_1.source_define(11, [0, 10], [1, 2], [1, 1], False)
 reaction_set_1.source_define(11, [0, 9], [1, 1], [1, 1], False)
-reaction_set_1.source_define(11,[0,11],[1,1],[1,1],True)
-reaction_set_1.source_define(11,[15,11],[1,1],[1,1],True)
+reaction_set_1.source_define(11, [0, 11], [1, 1], [1, 1], True)
+reaction_set_1.source_define(11, [15, 11], [1, 1], [1, 1], True)
 
-reaction_set_1.source_define(12,[0,9],[1,1],[1,1],False)
-reaction_set_1.source_define(12,[15,9],[1,1],[1,1],False)
+reaction_set_1.source_define(12, [0, 9], [1, 1], [1, 1], False)
+reaction_set_1.source_define(12, [15, 9], [1, 1], [1, 1], False)
 
-reaction_set_1.source_define(13,[0,10],[1,1],[1,1],False)
-reaction_set_1.source_define(13,[15,10],[1,1],[1,1],False)
+reaction_set_1.source_define(13, [0, 10], [1, 1], [1, 1], False)
+reaction_set_1.source_define(13, [15, 10], [1, 1], [1, 1], False)
 
-reaction_set_1.source_define(14,[0,11],[1,1],[1,1],False)
-reaction_set_1.source_define(14,[15,11],[1,1],[1,1],False)
+reaction_set_1.source_define(14, [0, 11], [1, 1], [1, 1], False)
+reaction_set_1.source_define(14, [15, 11], [1, 1], [1, 1], False)
 
-reaction_set_1.source_define(15,[0,6],[1,1],[1,1],False)
-reaction_set_1.source_define(15,[9,15],[1,1],[1,1],True)
+reaction_set_1.source_define(15, [0, 6], [1, 1], [1, 1], False)
+reaction_set_1.source_define(15, [9, 15], [1, 1], [1, 1], True)
 
-flow_toR130=Flow(100,103,'to_R130')
-properties_method=UserMethod()
-reactor = cstr_SingleLiqPhase(100., 100., 30, flow_toR130,reaction_set_1,properties_method)
+flow_toR130 = Flow(100, 103, 'to_R130')
+
+properties_method = UserMethod()
+reactor = CstrSingleLiqPhase(100., 100., 30, flow_toR130, reaction_set_1, properties_method)
 
 print(reaction_set_1.source_dict)
 
-
 print(flow_toR130.comp_dict)
 flow_toR130.get_mole_frac()
-

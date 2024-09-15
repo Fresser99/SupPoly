@@ -15,13 +15,12 @@ class PropertiesMethod(ABC):
 class UserMethod(PropertiesMethod):
 
     def calculate_molar_density_mixture(self, mole_frac, temperature, pressure, param_list):
-        return 0.
+        pass
 
     def calculate_molar_density_pure(self, temperature, pressure, params):
-        return 10.
+        pass
 
 class PengRobinsonMethod(PropertiesMethod):
 
     def calculate_molar_density_mixture(self, mole_frac,temperature,pressure):
-
-        return 10.
+        pass

@@ -5,15 +5,15 @@ from reactions import *
 from proptiesmethod import *
 
 
-class cstr_SingleLiqPhase():
+class CstrSingleLiqPhase:
 
-    def __init__(self, T, p, V, Inflow: Flow, rx_set: ReactionSet, prop: PropertiesMethod):
+    def __init__(self, t, p, v, inflow: Flow, rx_set: ReactionSet, prop: PropertiesMethod):
         self.ReactionSet = rx_set
-        self.Inflow = Inflow
+        self.Inflow = inflow
         self.PropertiesMethod = prop
-        self.Temperature = T
+        self.Temperature = t
         self.Pressure = p
-        self.Volume = V
+        self.Volume = v
         self.Mole_Frac_Dict = {}
         self.mole_frac_init(3)
 
@@ -55,7 +55,7 @@ class cstr_SingleLiqPhase():
 
     def mass_balance(self, solu):
 
-        MB_eq = []
+        mb_eq = []
         vm = self.PropertiesMethod.calculate_molar_density_mixture(self.Temperature)
 
         if vm != 0:
@@ -66,6 +66,6 @@ class cstr_SingleLiqPhase():
         for f in self.Inflow.comp_dict:
             eq = self.Inflow.comp_dict[f]['mole_flow'] - solu[0] + self.ReactionSet.calculate_rate(f,
                                                                                                    concen) * self.Volume
-            MB_eq.append(eq)
+            mb_eq.append(eq)
 
-        return MB_eq
+        return mb_eq

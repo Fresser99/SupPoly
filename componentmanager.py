@@ -2,11 +2,10 @@ from component import Component
 
 
 class GlobalComponentManager:
+    component_list = []
 
-    component_list=[]
     @classmethod
     def component_list_gen(cls, clist: list[Component]):
-
         for c in clist:
             cls.component_list.append(c.Formular)
 
@@ -20,4 +19,3 @@ class GlobalComponentManager:
         cls.component_list.append('first_mom_dead')
         cls.component_list.append('second_mom_dead')
         cls.component_list.append('counter_ion')
-
