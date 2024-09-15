@@ -3,7 +3,7 @@ from component import Component
 from reactor import cstr_SingleLiqPhase
 from reactions import *
 from flow import *
-from poptiesmethod import *
+from proptiesmethod import *
 
 component_list = [Component("IB"), Component("IP"), Component("HCL"), Component("EADC"), Component("HEXANE"),
                   Component("CH3CL")]
