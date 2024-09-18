@@ -76,3 +76,15 @@ print(reaction_set_1.source_dict)
 
 print(flow_toR130.comp_dict)
 flow_toR130.get_mole_frac()
+T = 178.15  # K
+P = 1e6  # Pa
+Tc = np.array([190.6, 305.4, 369.8, 425.2])  # K
+Pc = np.array([4.6e6, 4.88e6, 4.25e6, 3.8e6])  # Pa
+omega = np.array([0.011, 0.099, 0.153, 0.199])
+param_list={'Tc':Tc,'Pc':Pc,'Omega':omega}
+y = np.array([0.3, 0.4, 0.2, 0.1])  # 摩尔分数
+den,z=properties_method.calculate_molar_density_mixture(y,T,P,param_list)
+
+
+print(den)
+
