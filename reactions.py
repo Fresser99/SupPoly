@@ -80,7 +80,6 @@ class ReactionSet:
         source = [i for i in powerlaw_idx]
         source = source + param + order
         if is_sink:
-
             source.append(-1)
         else:
 
