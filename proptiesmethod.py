@@ -12,6 +12,9 @@ class PropertiesMethod(ABC):
     def calculate_molar_density_pure(self, *args, **kwargs):
         pass
 
+    @abstractmethod
+    def calculate_polymer_density(self,*args,**kwargs):
+        pass
 
 class UserMethod(PropertiesMethod):
 
@@ -37,21 +40,28 @@ class UserMethod(PropertiesMethod):
                  A - 3 * B ** 2 - 2 * B,
                  B ** 3 + B ** 2 - A * B]
 
-        # 使用 numpy.roots 求解
         Z_roots = np.roots(coeff)
 
-        # 过滤出实根并排序
         Z_real = Z_roots[np.isreal(Z_roots)].real
         Z_real = np.sort(Z_real)
 
-        # 计算对应的密度
         densities = pressure / (Z_real * R * temperature)
+
+
 
         return densities, Z_real
 
     def calculate_molar_density_pure(self, temperature, pressure, params):
         pass
 
+    def calculate_polymer_mass_density(self,temperature):
+
+        polyden=0.
+        if temperature<199.15:
+            polyden=1000.
+        else:
+            polyden=920.
+        return polyden
 
 class PengRobinsonMethod(PropertiesMethod):
 
