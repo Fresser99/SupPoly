@@ -13,8 +13,9 @@ class PropertiesMethod(ABC):
         pass
 
     @abstractmethod
-    def calculate_polymer_density(self,*args,**kwargs):
+    def calculate_polymer_density(self, *args, **kwargs):
         pass
+
 
 class UserMethod(PropertiesMethod):
 
@@ -47,21 +48,14 @@ class UserMethod(PropertiesMethod):
 
         densities = pressure / (Z_real * R * temperature)
 
-
-
         return densities, Z_real
 
     def calculate_molar_density_pure(self, temperature, pressure, params):
         pass
 
-    def calculate_polymer_mass_density(self,temperature):
+    def calculate_polymer_density(self, temperature):
+        pass
 
-        polyden=0.
-        if temperature<199.15:
-            polyden=1000.
-        else:
-            polyden=920.
-        return polyden
 
 class PengRobinsonMethod(PropertiesMethod):
 

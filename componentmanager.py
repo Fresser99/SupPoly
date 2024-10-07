@@ -1,7 +1,7 @@
 from component import Component
 
 
-class GlobalComponentManager:
+class  GlobalComponentManager:
     component_list = []
 
     @classmethod
