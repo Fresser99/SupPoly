@@ -23,10 +23,6 @@ class ReactionSet:
 
     def __init__(self):
         self.source_dict = {c: [] for c in GlobalComponentManager.component_list}
-        # self.reactions_set: list[Meta_Reaction] = rx_list
-        d = len(GlobalComponentManager.component_list)
-        # self.Rx_matrix = np.zeros([len(self.reactions_set), len(GlobalComponentManager.component_list)])
-        # self.output_rx_matrix()
 
     def output_rx_matrix(self):
 

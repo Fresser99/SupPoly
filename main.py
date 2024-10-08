@@ -7,31 +7,40 @@ from proptiesmethod import *
 import numpy as np
 
 component_list = [Component("IB", '115-11-7', CompType.conventional), Component("IP", '78-79-5', CompType.conventional),
-                  Component("HCL",'7647-01-0',CompType.conventional),
-                  Component("EADC",'563-43-9',CompType.conventional), Component("HEXANE"),
-                  Component("CH3CL")]
+                  Component("HCL", '7647-01-0', CompType.conventional),
+                  Component("EADC", '563-43-9', CompType.conventional),
+                  Component("HEXANE", '110-54-3', CompType.conventional),
+                  Component("CH3CL", '110-54-3', CompType.conventional)]
 
-componentmanager.GlobalComponentManager.component_list_gen(component_list)
+componentmanager.GlobalComponentManager.component_list_gen(component_list, 'CATION', 3)
 
-reaction_set_1 = ReactionSet()
-# print(reaction_set_1.Rx_matrix)
-# ss=reaction_set_1.pirnt_kinetics()
-# print(ss)
+print(len(componentmanager.GlobalComponentManager.component_list))
 print(GlobalComponentManager.component_list)
+reaction_set_1 = ReactionSet()
+
+reaction_set_1.source_define(0, [0, 6], [1, 1], [1, 1], True,k_constant=3000)
 reaction_set_1.source_define(0, [0, 6], [1, 1], [1, 1], True)
-reaction_set_1.source_define(0, [0, 7], [1, 1], [1, 1], True)
-reaction_set_1.source_define(0, [0, 9], [1, 1], [1, 1], True)
-reaction_set_1.source_define(0, [0, 9], [1, 1], [1, 1], True)
+reaction_set_1.source_define(0, [0, 6], [1, 1], [1, 1], True)
+reaction_set_1.source_define(0, [0, 10], [1, 1], [1, 1], True)
+reaction_set_1.source_define(0, [0, 11], [1, 1], [1, 1], True)
+reaction_set_1.source_define(0, [0, 12], [1, 1], [1, 1], True)
+reaction_set_1.source_define(0, [0, 10], [1, 1], [1, 1], True)
+reaction_set_1.source_define(0, [0, 11], [1, 1], [1, 1], True)
+reaction_set_1.source_define(0, [0, 12], [1, 1], [1, 1], True)
 
 reaction_set_1.source_define(2, [2, 3], [1, 1], [1, 1], True)
 reaction_set_1.source_define(3, [2, 3], [1, 1], [1, 1], True)
 
 reaction_set_1.source_define(6, [2, 3], [1, 1], [1, 1], False)
 reaction_set_1.source_define(6, [0, 6], [1, 1], [1, 1], True)
-reaction_set_1.source_define(6, [9, 15], [1, 1], [1, 1], False)
+reaction_set_1.source_define(6, [0, 6], [1, 1], [1, 1], True)
+reaction_set_1.source_define(6, [0, 6], [1, 1], [1, 1], True)
+reaction_set_1.source_define(6, [10, 15], [1, 1], [1, 1], False)
+reaction_set_1.source_define(6, [11, 15], [1, 1], [1, 1], False)
+reaction_set_1.source_define(6, [12, 15], [1, 1], [1, 1], False)
 
 reaction_set_1.source_define(7, [0, 6], [1, 1], [1, 1], False)
-reaction_set_1.source_define(7, [0, 9], [1, 1], [1, 1], False)
+reaction_set_1.source_define(7, [0, 7], [1, 1], [1, 1], True)
 
 reaction_set_1.source_define(8, [0, 7], [1, 1], [1, 1], False)
 reaction_set_1.source_define(8, [0, 8], [1, 1], [1, 1], True)
@@ -67,19 +76,7 @@ flow_toR130 = Flow(100, 103, 'to_R130')
 
 properties_method = UserMethod()
 reactor = CstrSingleLiqPhase(100., 100., 30, flow_toR130, reaction_set_1, properties_method)
-solu = np.zeros(30)
-reactor.mass_balance(solu)
+
 print(reaction_set_1.source_dict)
 
-print(flow_toR130.comp_dict)
-flow_toR130.get_mole_frac()
-T = 178.15  # K
-P = 1e6  # Pa
-Tc = np.array([190.6, 305.4, 369.8, 425.2])  # K
-Pc = np.array([4.6e6, 4.88e6, 4.25e6, 3.8e6])  # Pa
-omega = np.array([0.011, 0.099, 0.153, 0.199])
-param_list = {'Tc': Tc, 'Pc': Pc, 'Omega': omega}
-y = np.array([0.3, 0.4, 0.2, 0.1])  # 摩尔分数
-den, z = properties_method.calculate_molar_density_mixture(y, T, P, param_list)
 
-print(den)
