@@ -57,17 +57,19 @@ class CstrSingleLiqPhase:
     def mass_balance(self, solu):
 
         mb_eq = []
+        
         # molar density [mol/m3]
-        vm_liq = self.PropertiesMethod.calculate_molar_density_mixture(self.Temperature)
+        vm_liq = self.PropertiesMethod.calculate_molar_density_mixture(self.Mole_Frac_Dict, self.Temperature,
+                                                                       self.Pressure)
 
-        moleflow_first_mom=solu[0]+solu[1]+solu[2]+solu[3]+solu[4]+solu[5]+solu[6]+solu[7]+solu[10]+solu[13]+solu[15]
+        moleflow_first_mom = solu[0] + solu[1] + solu[2] + solu[3] + solu[4] + solu[5] + solu[6] + solu[7] + solu[10] + \
+                             solu[13] + solu[15]
 
-        qout=moleflow_first_mom/vm_liq
+        qout = moleflow_first_mom / vm_liq
 
-        concen=solu/qout
+        concen = solu / qout
 
         for f in self.Inflow.comp_dict:
-
             eq = self.Inflow.comp_dict[f]['mole_flow'] - solu[0] + self.ReactionSet.calculate_rate(f,
                                                                                                    concen) * self.Volume
             mb_eq.append(eq)
