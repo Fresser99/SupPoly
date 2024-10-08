@@ -18,23 +18,45 @@ print(len(componentmanager.GlobalComponentManager.component_list))
 print(GlobalComponentManager.component_list)
 reaction_set_1 = ReactionSet()
 
-reaction_set_1.source_define(0, [0, 6], [1, 1], [1, 1], True,k_constant=3000)
+# IB + ion-pair ——> P1[1] + counter-ion
+reaction_set_1.source_define(0, [0, 6], [1, 1], [1, 1], True, k_constant=3000)
+# IB + ion-pair ——> P1[2] + counter-ion
 reaction_set_1.source_define(0, [0, 6], [1, 1], [1, 1], True)
+# IB + ion-pair ——> P1[3] + counter-ion
 reaction_set_1.source_define(0, [0, 6], [1, 1], [1, 1], True)
+# IB + Y0[1] ——>  Y0[1]
 reaction_set_1.source_define(0, [0, 10], [1, 1], [1, 1], True)
+# IB + Y0[2] ——>  Y0[2]
 reaction_set_1.source_define(0, [0, 11], [1, 1], [1, 1], True)
+# IB + Y0[3] ——>  Y0[3]
 reaction_set_1.source_define(0, [0, 12], [1, 1], [1, 1], True)
+# IB + Y0[1] ——> D0[1]+P1[1]
 reaction_set_1.source_define(0, [0, 10], [1, 1], [1, 1], True)
+# IB + Y0[2] ——> D0[2]+P1[1]
 reaction_set_1.source_define(0, [0, 11], [1, 1], [1, 1], True)
+# IB + Y0[3] ——> D0[3]+P1[3]
 reaction_set_1.source_define(0, [0, 12], [1, 1], [1, 1], True)
 
+
+# HCL + EADC ——> ion-pair
 reaction_set_1.source_define(2, [2, 3], [1, 1], [1, 1], True)
+# EADC + HCL ——> ion-pair
 reaction_set_1.source_define(3, [2, 3], [1, 1], [1, 1], True)
 
+
+# HCL + EADC ——> ion-pair
 reaction_set_1.source_define(6, [2, 3], [1, 1], [1, 1], False)
+
+# IB + ion-pair ——> P1[1] + counter-ion
 reaction_set_1.source_define(6, [0, 6], [1, 1], [1, 1], True)
+
+# IB + ion-pair ——> P1[2] + counter-ion
 reaction_set_1.source_define(6, [0, 6], [1, 1], [1, 1], True)
+
+# IB + ion-pair ——> P1[3] + counter-ion
 reaction_set_1.source_define(6, [0, 6], [1, 1], [1, 1], True)
+
+# ion-pair
 reaction_set_1.source_define(6, [10, 15], [1, 1], [1, 1], False)
 reaction_set_1.source_define(6, [11, 15], [1, 1], [1, 1], False)
 reaction_set_1.source_define(6, [12, 15], [1, 1], [1, 1], False)
@@ -78,5 +100,3 @@ properties_method = UserMethod()
 reactor = CstrSingleLiqPhase(100., 100., 30, flow_toR130, reaction_set_1, properties_method)
 
 print(reaction_set_1.source_dict)
-
-
