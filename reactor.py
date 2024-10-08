@@ -60,7 +60,7 @@ class CstrSingleLiqPhase:
         # molar density [mol/m3]
         vm_liq = self.PropertiesMethod.calculate_molar_density_mixture(self.Temperature)
 
-        moleflow_first_mom=solu[0]+solu[1]+solu[2]+solu[3]+solu[4]+solu[5]+solu[6]+solu[7]+solu[10]+solu[13]+solu[15];
+        moleflow_first_mom=solu[0]+solu[1]+solu[2]+solu[3]+solu[4]+solu[5]+solu[6]+solu[7]+solu[10]+solu[13]+solu[15]
 
         qout=moleflow_first_mom/vm_liq
 
