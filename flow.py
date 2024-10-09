@@ -9,7 +9,8 @@ class Flow:
         self.Temperature = t
         self.Pressure = p
         self.Name = name
-        self.comp_dict = {c: {"mass_flow": 0., "mole_flow": 0.} for c in GlobalComponentManager.component_list}
+        self.comp_dict = {c.Formular if c is Component else c.name: {"mass_flow": 0., "mole_flow": 0., "polymer_flow_momentum": c.SpecificComponent if c is SpecificComponent else 0} for c in
+                          GlobalComponentManager.component_list}
 
     def get_mole_frac(self):
         tot_mole = []

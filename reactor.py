@@ -1,3 +1,5 @@
+import numpy as np
+
 import componentmanager
 from flow import *
 from componentmanager import GlobalComponentManager
@@ -54,14 +56,24 @@ class CstrSingleLiqPhase:
         self.Mole_Frac_Dict['second_mom_dead'] = second_mom_dead
         self.Mole_Frac_Dict['counter_ion'] = 0.0
 
-    def mass_balance(self, solu):
+    def mass_balance(self, Outflow: Flow):
 
         mb_eq = []
-        
+
+
+        Mole_flow_zeroth = np.array(
+            [mole['mole_flow'] if mole['polymer_flow_momentum'] == 0 else 0.0
+             for mole in Outflow.comp_dict])
+
+        Mole_flow_first = np.array(
+            [mole['mole_flow'] if all(mole['polymer_flow_momentum'] == [0, 1]) else 0.0 for
+             mole in Outflow.comp_dict])
+
+        Mole_frac_zeroth = Mole_flow_zeroth / np.sum(Mole_flow_zeroth)
+
         # molar density [mol/m3]
         vm_liq = self.PropertiesMethod.calculate_molar_density_mixture(self.Mole_Frac_Dict, self.Temperature,
                                                                        self.Pressure)
-
         moleflow_first_mom = solu[0] + solu[1] + solu[2] + solu[3] + solu[4] + solu[5] + solu[6] + solu[7] + solu[10] + \
                              solu[13] + solu[15]
 

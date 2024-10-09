@@ -66,13 +66,16 @@ class ReactionSet:
         elif type == MetaComponentType.MONOMER:
             self.configure_dict["MONOMER"].append(comp)
 
-    def source_define(self, idx_obj, powerlaw_idx, param=None, order=None, is_sink=True, k_constant=0.):
+    def source_define(self, idx_obj, powerlaw_idx, k_constant, param=None, order=None, is_sink=True, ):
 
         if order is None:
             order = [1, 1]
         if param is None:
             param = [1, 1]
-        comp = GlobalComponentManager.component_list[idx_obj]
+        comp = GlobalComponentManager.component_list[idx_obj].Formular if GlobalComponentManager.component_list[
+                                                                              idx_obj] is Component else \
+        GlobalComponentManager.component_list[idx_obj].name
+
         source = [i for i in powerlaw_idx]
         source = source + param + order
         if is_sink:
@@ -80,7 +83,8 @@ class ReactionSet:
         else:
 
             source.append(1)
-        source.append(k_constant)
+        source.append(k_constant['value'])
+        source.append(k_constant['name'])
         self.source_dict[comp].append(source)
 
     def calculate_rate(self, comp_key, concen):
@@ -91,6 +95,16 @@ class ReactionSet:
 
         return tot_rate
 
+    def preview_reaction_equations(self):
+
+        for i in self.source_dict:
+            eq = 'r' + '['+str(i)+']' + '='
+            for s in self.source_dict[i]:
+                eq = eq + ('-' if s[6] == -1 else '+') + str(s[8]) + '*' + str(
+                    s[2]) + '*' + '[' + GlobalComponentManager.component_list[s[0]] + ']' + '*' + str(
+                    s[3]) + '*' + '[' + GlobalComponentManager.component_list[s[1]] + ']'
+            print(eq)
+
 
 class MetaReaction:
 
@@ -98,3 +112,4 @@ class MetaReaction:
         self.lf = left_side_comps
         self.rt = right_side_comps
         self.is_reserve = is_reservable
+

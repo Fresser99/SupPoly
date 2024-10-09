@@ -1,10 +1,10 @@
-﻿CATION
+CATION
 ion-pair
 p1_ion;NSite
-zeroth_mom_live;NSite
-first_mom_live;NSite
-second_mom_live;NSite
-zeroth_mom_dead;NSite
-first_mom_dead;NSite
-second_mom_dead;NSite
+zeroth_mom_live;NSite;0
+first_mom_live;NSite;1
+second_mom_live;NSite;2
+zeroth_mom_dead;NSite;0
+first_mom_dead;NSite;1
+second_mom_dead;NSite;2
 counter_ion
