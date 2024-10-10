@@ -22,7 +22,7 @@ class MetaReactionType(Enum):
 class ReactionSet:
 
     def __init__(self):
-        self.source_dict = {c: [] for c in GlobalComponentManager.component_list}
+        self.source_dict = {c.name: [] for c in GlobalComponentManager.component_list}
 
     def output_rx_matrix(self):
 
@@ -72,9 +72,9 @@ class ReactionSet:
             order = [1, 1]
         if param is None:
             param = [1, 1]
-        comp = GlobalComponentManager.component_list[idx_obj].Formular if GlobalComponentManager.component_list[
-                                                                              idx_obj] is Component else \
-        GlobalComponentManager.component_list[idx_obj].name
+        cc = GlobalComponentManager.component_list[idx_obj]
+        comp = cc.name
+        # comp = GlobalComponentManager.component_list[idx_obj].Formular if GlobalComponentManager.component_list[idx_obj] is Component else GlobalComponentManager.component_list[idx_obj].name
 
         source = [i for i in powerlaw_idx]
         source = source + param + order
@@ -98,11 +98,11 @@ class ReactionSet:
     def preview_reaction_equations(self):
 
         for i in self.source_dict:
-            eq = 'r' + '['+str(i)+']' + '='
+            eq = 'r' + '[' + str(i) + ']' + '='
             for s in self.source_dict[i]:
                 eq = eq + ('-' if s[6] == -1 else '+') + str(s[8]) + '*' + str(
-                    s[2]) + '*' + '[' + GlobalComponentManager.component_list[s[0]] + ']' + '*' + str(
-                    s[3]) + '*' + '[' + GlobalComponentManager.component_list[s[1]] + ']'
+                    s[2]) + '*' + '[' + GlobalComponentManager.component_list[s[0]].name + ']' + '*' + str(
+                    s[3]) + '*' + '[' + GlobalComponentManager.component_list[s[1]].name + ']'
             print(eq)
 
 
@@ -112,4 +112,3 @@ class MetaReaction:
         self.lf = left_side_comps
         self.rt = right_side_comps
         self.is_reserve = is_reservable
-

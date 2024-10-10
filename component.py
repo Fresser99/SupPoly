@@ -10,10 +10,10 @@ class CompType(Enum):
 class Component:
 
     def __init__(self, formular, cas, comp_type):
-        self.Formular = formular
+        self.name = formular
         self.CAS = cas
         self.type = comp_type
-        self.polymer_mole_flow_relative = False
+        self.polymer_mole_flow_relative = -2
 
 
 class Polymer(Component):

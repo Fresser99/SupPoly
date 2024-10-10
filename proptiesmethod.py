@@ -1,6 +1,11 @@
 from abc import ABC, abstractmethod
 import numpy as np
 
+import pcsaft.pcsaft
+
+
+# from pcsaft.pcsaft import *
+
 
 class PropertiesMethod(ABC):
 
@@ -54,6 +59,23 @@ class UserMethod(PropertiesMethod):
         pass
 
     def calculate_polymer_density(self, temperature):
+        pass
+
+
+class IIR_PCSAFT(PropertiesMethod):
+
+    def __init__(self,param):
+        self.pcsaft = pcsaft.pcsaft.PCSAFT()
+        self.param = param
+
+    def calculate_molar_density_mixture(self, temperature, pressure, param, mole_frac, polymer_mole_frac_zeroth, dpn):
+        den = self.pcsaft.compute_density(temperature, pressure, mole_frac, 0, param)
+        return self.pcsaft.compute_den_correction(den, polymer_mole_frac_zeroth, dpn)
+
+    def calculate_polymer_density(self, *args, **kwargs):
+        pass
+
+    def calculate_molar_density_pure(self, *args, **kwargs):
         pass
 
 

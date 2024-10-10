@@ -1,10 +1,12 @@
 import componentmanager
 from component import *
-from reactor import CstrSingleLiqPhase
+# from reactor import CstrSingleLiqPhase
 from reactions import *
 from flow import *
 from proptiesmethod import *
 import numpy as np
+from pcsaft.param import *
+from pcsaft.pcsaft import *
 
 site_num = 3
 
@@ -14,16 +16,33 @@ component_list = [Component("IB", '115-11-7', CompType.conventional), Component(
                   Component("HCL", '7647-01-0', CompType.conventional),
                   Component("EADC", '563-43-9', CompType.conventional),
                   Component("HEXANE", '110-54-3', CompType.conventional),
-                  Component("CH3CL", '110-54-3', CompType.conventional), IIR]
+                  Component("CH3CL", '74-87-3', CompType.conventional), IIR]
 
 componentmanager.GlobalComponentManager.component_list_gen(component_list, 'CATION', site_num)
 
-print(len(componentmanager.GlobalComponentManager.component_list))
+param = Param
+properties_package = IIR_PCSAFT(param)
+param.m = np.array([])
+param.e = np.array([])
+param.s = np.array([])
 for c in GlobalComponentManager.component_list:
     if type(c) is Component:
-        print(c.Formular)
-    elif type(c) is SpecificComponent:
-        print(c.name)
+        param.m = np.append(param.m, np.float32(properties_package.pcsaft.retrive_param_from_DB(c.CAS, 'PCFTM')))
+        param.e = np.append(param.e, np.float32(properties_package.pcsaft.retrive_param_from_DB(c.CAS,'PCFTU')))
+        param.s = np.append(param.s, np.float32(properties_package.pcsaft.retrive_param_from_DB(c.CAS,'PCFTV')))
+
+param.m=np.append(param.m,np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IP-R','PCFTR')))
+param.e=np.append(param.m,np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IP-R','PCFTU')))
+param.s=np.append(param.m,np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IP-R','PCFTV')))
+
+
+print(param.m)
+print(param.s)
+print(param.e)
+print(properties_package.param.m)
+print(len(componentmanager.GlobalComponentManager.component_list))
+for c in GlobalComponentManager.component_list:
+    print(c.name)
 reaction_set_1 = ReactionSet()
 
 # IB + ion-pair ——> P1[1] + counter-ion
@@ -289,6 +308,6 @@ reaction_set_1.source_define(28, [12, 28], {'name': 'Kd(3)', 'value': 0.0}, [1, 
 flow_toR130 = Flow(100, 103, 'to_R130')
 
 properties_method = UserMethod()
-reactor = CstrSingleLiqPhase(100., 100., 30, flow_toR130, reaction_set_1, properties_method)
+# reactor = CstrSingleLiqPhase(100., 100., 30, flow_toR130, reaction_set_1, properties_method)
 print(reaction_set_1.source_dict)
 reaction_set_1.preview_reaction_equations()
