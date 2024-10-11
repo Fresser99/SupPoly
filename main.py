@@ -1,6 +1,6 @@
 import componentmanager
 from component import *
-# from reactor import CstrSingleLiqPhase
+from reactor import CstrSingleLiqPhase
 from reactions import *
 from flow import *
 from proptiesmethod import *
@@ -12,11 +12,11 @@ site_num = 3
 
 IIR = Polymer([Segment('IB-R', 'IB-R-seg', CompType.segment)], 'IIR', 'IIR', CompType.polymer)
 
-component_list = [Component("IB", '115-11-7', CompType.conventional), Component("IP", '78-79-5', CompType.conventional),
-                  Component("HCL", '7647-01-0', CompType.conventional),
-                  Component("EADC", '563-43-9', CompType.conventional),
-                  Component("HEXANE", '110-54-3', CompType.conventional),
-                  Component("CH3CL", '74-87-3', CompType.conventional), IIR]
+component_list = [Component("IB", '115-11-7', CompType.conventional, 56.1075), Component("IP", '78-79-5', CompType.conventional,68.1185),
+                  Component("HCL", '7647-01-0', CompType.conventional, 36.4606),
+                  Component("EADC", '563-43-9', CompType.conventional, 126.949),
+                  Component("HEXANE", '110-54-3', CompType.conventional, 86.1772),
+                  Component("CH3CL", '74-87-3', CompType.conventional,50.4875), IIR]
 
 componentmanager.GlobalComponentManager.component_list_gen(component_list, 'CATION', site_num)
 
@@ -25,16 +25,21 @@ properties_package = IIR_PCSAFT(param)
 param.m = np.array([])
 param.e = np.array([])
 param.s = np.array([])
+param.r =np.array([])
+param.MW = np.array([])
 for c in GlobalComponentManager.component_list:
     if type(c) is Component:
         param.m = np.append(param.m, np.float32(properties_package.pcsaft.retrive_param_from_DB(c.CAS, 'PCFTM')))
-        param.e = np.append(param.e, np.float32(properties_package.pcsaft.retrive_param_from_DB(c.CAS,'PCFTU')))
-        param.s = np.append(param.s, np.float32(properties_package.pcsaft.retrive_param_from_DB(c.CAS,'PCFTV')))
+        param.e = np.append(param.e, np.float32(properties_package.pcsaft.retrive_param_from_DB(c.CAS, 'PCFTU')))
+        param.s = np.append(param.s, np.float32(properties_package.pcsaft.retrive_param_from_DB(c.CAS, 'PCFTV')))
+        param.MW = np.append(param.MW, np.float32(properties_package.pcsaft.retrive_param_from_DB(c.CAS, 'MW')))
 
-param.m=np.append(param.m,np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IP-R','PCFTR')))
-param.e=np.append(param.m,np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IP-R','PCFTU')))
-param.s=np.append(param.m,np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IP-R','PCFTV')))
 
+param.m = np.append(param.m, np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IP-R', 'PCFTR')))
+param.e = np.append(param.e, np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IP-R', 'PCFTU')))
+param.s = np.append(param.s, np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IP-R', 'PCFTV')))
+param.MW = np.append(param.MW, np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IP-R', 'MW')))
+param.r = np.append(param.r, np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IP-R', 'PCFTR')))
 
 print(param.m)
 print(param.s)
@@ -306,8 +311,9 @@ reaction_set_1.source_define(28, [11, 28], {'name': 'Kd(2)', 'value': 0.0}, [1, 
 reaction_set_1.source_define(28, [12, 28], {'name': 'Kd(3)', 'value': 0.0}, [1, 1], [1, 1], True)
 
 flow_toR130 = Flow(100, 103, 'to_R130')
-
-properties_method = UserMethod()
-# reactor = CstrSingleLiqPhase(100., 100., 30, flow_toR130, reaction_set_1, properties_method)
-print(reaction_set_1.source_dict)
-reaction_set_1.preview_reaction_equations()
+flow_toR130.set_MassFlow_conventional({'IB': 4070., 'IP': 0, 'HCL': 17, 'EADC': 0.5, 'HEXANE': 150, 'CH3CL': 7300})
+flow_outR130 = Flow(t=0, p=101, name='R130_out')
+reactor = CstrSingleLiqPhase(100., 100., 30, flow_toR130, reaction_set_1, properties_package)
+# print(reaction_set_1.source_dict)
+# reaction_set_1.preview_reaction_equations()
+eqs = reactor.mass_balance(flow_outR130)
