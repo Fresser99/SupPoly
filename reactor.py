@@ -5,6 +5,7 @@ from flow import *
 from componentmanager import GlobalComponentManager
 from reactions import *
 from proptiesmethod import *
+import pyomo.environ as pyo
 
 
 class CstrSingleLiqPhase:
@@ -17,87 +18,46 @@ class CstrSingleLiqPhase:
         self.Temperature = t
         self.Pressure = p
         self.Volume = v
-        self.Mole_Frac_Dict = {}
-        self.mole_frac_init(3)
-
-    def mole_frac_init(self, site):
-
-        self.Mole_Frac_Dict = {c: 0. for c in GlobalComponentManager.component_list}
-        self.Mole_Frac_Dict['ion-pair'] = 0.
-        active_spices = []
-        p1_ion = []
-
-        zeroth_mom_live = []
-        first_mom_live = []
-        second_mom_live = []
-
-        zeroth_mom_dead = []
-        first_mom_dead = []
-        second_mom_dead = []
-
-        for i in range(0, site):
-            active_spices.append(0.0)
-            p1_ion.append(0.0)
-            zeroth_mom_live.append(0.0)
-            first_mom_live.append(0.0)
-            second_mom_live.append(0.0)
-
-            zeroth_mom_dead.append(0.0)
-            first_mom_dead.append(0.0)
-            second_mom_dead.append(0.0)
-
-        self.Mole_Frac_Dict['active_species'] = active_spices
-        self.Mole_Frac_Dict['p1_ion'] = p1_ion
-        self.Mole_Frac_Dict['zeroth_mom_live'] = zeroth_mom_live
-        self.Mole_Frac_Dict['first_mom_live'] = first_mom_live
-        self.Mole_Frac_Dict['second_mom_live'] = second_mom_live
-        self.Mole_Frac_Dict['zeroth_mom_dead'] = zeroth_mom_dead
-        self.Mole_Frac_Dict['first_mom_dead'] = first_mom_dead
-        self.Mole_Frac_Dict['second_mom_dead'] = second_mom_dead
-        self.Mole_Frac_Dict['counter_ion'] = 0.0
 
     def mass_balance(self, Outflow: Flow):
 
         mb_eq = []
 
-        for m in Outflow.comp_dict:
-            print(m)
-
         polymer_Mole_flow_zeroth = np.array(
-            [Outflow.comp_dict[mole]['mole_flow'] if Outflow.comp_dict[mole]['polymer_flow_momentum'] == 0 else 0.0
+            [pyo.value(Outflow.comp_dict[mole]['mole_flow']) if Outflow.comp_dict[mole]['polymer_flow_momentum'] == 0 else 0.0
              for mole in Outflow.comp_dict])
 
         polymer_Mole_flow_first = np.array(
-            [Outflow.comp_dict[mole]['mole_flow'] if Outflow.comp_dict[mole]['polymer_flow_momentum'] == 1 else 0.0
+            [pyo.value(Outflow.comp_dict[mole]['mole_flow']) if Outflow.comp_dict[mole]['polymer_flow_momentum'] == 1 else 0.0
              for mole in Outflow.comp_dict])
 
         Mole_flow_zeroth = np.array(
-            [Outflow.comp_dict[mole]['mole_flow'] if Outflow.comp_dict[mole]['polymer_flow_momentum'] in [0,
+            [pyo.value(Outflow.comp_dict[mole]['mole_flow']) if Outflow.comp_dict[mole]['polymer_flow_momentum'] in [0,
                                                                                                           -2] else 0.0
              for
              mole in Outflow.comp_dict])
 
         Mole_flow_first = np.array(
-            [Outflow.comp_dict[mole]['mole_flow'] if Outflow.comp_dict[mole]['polymer_flow_momentum'] in [1,
+            [pyo.value(Outflow.comp_dict[mole]['mole_flow']) if Outflow.comp_dict[mole]['polymer_flow_momentum'] in [1,
                                                                                                           -2] else 0.0
              for
              mole in Outflow.comp_dict])
 
         Mole_frac_zeroth = Mole_flow_zeroth / np.sum(Mole_flow_zeroth)
         Mole_frac_first = Mole_flow_first / np.sum(Mole_flow_first)
-        dpn = (np.sum(polymer_Mole_flow_first) / np.sum(polymer_Mole_flow_zeroth)) if np.sum(
-            polymer_Mole_flow_zeroth) != 0. else 1e12
+        dpn = (np.sum(polymer_Mole_flow_first) / np.sum(polymer_Mole_flow_zeroth))
 
         c_idx_list = []
         for c_idx, comp in enumerate(GlobalComponentManager.component_list):
             if type(comp) is Component:
                 c_idx_list.append(c_idx)
 
-        mole_flow_properties = np.append(Mole_flow_zeroth[c_idx_list],np.sum(polymer_Mole_flow_zeroth))
+        mole_flow_properties = np.append(Mole_flow_zeroth[c_idx_list], pyo.value(np.sum(polymer_Mole_flow_zeroth)))
         mole_frac_properties = mole_flow_properties / np.sum(mole_flow_properties)
 
         pc_ftr_polymer = self.PropertiesMethod.param.r[-1]
-        self.PropertiesMethod.param.m[-1] = pc_ftr_polymer * dpn * self.PropertiesMethod.param.MW[-1]
+
+        self.PropertiesMethod.param.m[-1] = pc_ftr_polymer * pyo.value(dpn) * self.PropertiesMethod.param.MW[-1]
 
         vm_liq = self.PropertiesMethod.calculate_molar_density_mixture(self.Temperature, self.Pressure,
                                                                        self.PropertiesMethod.param,
@@ -107,7 +67,7 @@ class CstrSingleLiqPhase:
 
         q_out = np.sum(Mole_flow_first) / vm_liq
 
-        concentration = np.array([c['mole_flow'] / q_out for c in Outflow.comp_dict])
+        concentration = np.array([Outflow.comp_dict[c]['mole_flow'] / q_out for c in Outflow.comp_dict])
 
         for f in self.Inflow.comp_dict:
             eq = self.Inflow.comp_dict[f]['mole_flow'] - Outflow.comp_dict[f][

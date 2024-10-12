@@ -13,7 +13,7 @@ class GlobalComponentManager:
     component_list = []
 
     @classmethod
-    def component_list_gen(cls, clist: list[Component], poly_Type, poly_site):
+    def component_list_gen(cls, clist, poly_Type, poly_site):
         for c in clist:
             if c.type == CompType.conventional:
                 cls.component_list.append(c)
