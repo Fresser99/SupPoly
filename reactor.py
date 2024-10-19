@@ -18,28 +18,29 @@ class CstrSingleLiqPhase:
         self.Temperature = t
         self.Pressure = p
         self.Volume = v
-
     def mass_balance(self, Outflow: Flow):
 
         mb_eq = []
 
         polymer_Mole_flow_zeroth = np.array(
-            [pyo.value(Outflow.comp_dict[mole]['mole_flow']) if Outflow.comp_dict[mole]['polymer_flow_momentum'] == 0 else 0.0
+            [pyo.value(Outflow.comp_dict[mole]['mole_flow']) if Outflow.comp_dict[mole][
+                                                                    'polymer_flow_momentum'] == 0 else 0.0
              for mole in Outflow.comp_dict])
 
         polymer_Mole_flow_first = np.array(
-            [pyo.value(Outflow.comp_dict[mole]['mole_flow']) if Outflow.comp_dict[mole]['polymer_flow_momentum'] == 1 else 0.0
+            [pyo.value(Outflow.comp_dict[mole]['mole_flow']) if Outflow.comp_dict[mole][
+                                                                    'polymer_flow_momentum'] == 1 else 0.0
              for mole in Outflow.comp_dict])
 
         Mole_flow_zeroth = np.array(
             [pyo.value(Outflow.comp_dict[mole]['mole_flow']) if Outflow.comp_dict[mole]['polymer_flow_momentum'] in [0,
-                                                                                                          -2] else 0.0
+                                                                                                                     -2] else 0.0
              for
              mole in Outflow.comp_dict])
 
         Mole_flow_first = np.array(
             [pyo.value(Outflow.comp_dict[mole]['mole_flow']) if Outflow.comp_dict[mole]['polymer_flow_momentum'] in [1,
-                                                                                                          -2] else 0.0
+                                                                                                                     -2] else 0.0
              for
              mole in Outflow.comp_dict])
 
@@ -58,21 +59,23 @@ class CstrSingleLiqPhase:
         pc_ftr_polymer = self.PropertiesMethod.param.r[-1]
 
         self.PropertiesMethod.param.m[-1] = pc_ftr_polymer * pyo.value(dpn) * self.PropertiesMethod.param.MW[-1]
-
+        print("dpn:"+str(dpn))
         vm_liq = self.PropertiesMethod.calculate_molar_density_mixture(self.Temperature, self.Pressure,
                                                                        self.PropertiesMethod.param,
                                                                        mole_frac_properties, mole_frac_properties[-1],
                                                                        dpn)
+        #print(vm_liq)
         # molar density [mol/m3]
 
-        q_out = np.sum(Mole_flow_first) / vm_liq
+        q_out = np.sum(Mole_flow_first) * 1000 / vm_liq
 
         concentration = np.array([Outflow.comp_dict[c]['mole_flow'] / q_out for c in Outflow.comp_dict])
 
         for f in self.Inflow.comp_dict:
+            print(f+": "+str(pyo.value(self.ReactionSet.calculate_rate(f, concentration))*self.Volume*3600))
             eq = self.Inflow.comp_dict[f]['mole_flow'] - Outflow.comp_dict[f][
                 'mole_flow'] + self.ReactionSet.calculate_rate(f,
-                                                               concentration) * self.Volume * 3600.
+                                                               concentration) * self.Volume * 3600
             mb_eq.append(eq)
 
         return mb_eq
