@@ -18,6 +18,7 @@ class CstrSingleLiqPhase:
         self.Temperature = t
         self.Pressure = p
         self.Volume = v
+
     def mass_balance(self, Outflow: Flow):
 
         mb_eq = []
@@ -59,13 +60,10 @@ class CstrSingleLiqPhase:
         pc_ftr_polymer = self.PropertiesMethod.param.r[-1]
 
         self.PropertiesMethod.param.m[-1] = pc_ftr_polymer * pyo.value(dpn) * self.PropertiesMethod.param.MW[-1]
-        print("dpn:"+str(dpn))
         vm_liq = self.PropertiesMethod.calculate_molar_density_mixture(self.Temperature, self.Pressure,
                                                                        self.PropertiesMethod.param,
                                                                        mole_frac_properties, mole_frac_properties[-1],
                                                                        dpn)
-        #print(vm_liq)
-        # molar density [mol/m3]
 
         q_out = np.sum(Mole_flow_first) * 1000 / vm_liq
 
@@ -79,3 +77,23 @@ class CstrSingleLiqPhase:
             mb_eq.append(eq)
 
         return mb_eq
+
+
+class PFRSingleliqPhase:
+
+    def __init__(self, t, p, l, area, inflow: Flow, rx_set: ReactionSet, prop: PropertiesMethod):
+        self.ReactionSet = rx_set
+        self.Inflow = inflow
+        self.PropertiesMethod = prop
+        self.Temperature = t
+        self.Pressure = p
+        self.Area = area
+        self.Length = l
+
+    def mass_balance(self, model, comp, z):
+
+        concentrations = [model.C[c, z] for c in model.comps]
+        rate = self.ReactionSet.calculate_rate(comp, concentrations)
+        return model.dFdz[comp, z] == rate * self.Area*3600
+
+

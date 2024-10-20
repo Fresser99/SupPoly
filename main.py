@@ -1,8 +1,9 @@
+from pyomo import dae
 from pyomo.opt import SolverFactory
 
 import componentmanager
 from component import *
-from reactor import CstrSingleLiqPhase
+from reactor import *
 from reactions import *
 from flow import *
 from proptiesmethod import *
@@ -10,6 +11,8 @@ import numpy as np
 from pcsaft.param import *
 from pcsaft.pcsaft import *
 import pyomo.environ as pyo
+from solvermanage import *
+import matplotlib.pyplot as plt
 
 site_num = 3
 
@@ -40,11 +43,11 @@ for c in GlobalComponentManager.component_list:
         param.s = np.append(param.s, np.float32(properties_package.pcsaft.retrive_param_from_DB(c.CAS, 'PCFTV')))
         param.MW = np.append(param.MW, np.float32(properties_package.pcsaft.retrive_param_from_DB(c.CAS, 'MW')))
 
-param.m = np.append(param.m, np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IP-R', 'PCFTR')))
-param.e = np.append(param.e, np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IP-R', 'PCFTU')))
-param.s = np.append(param.s, np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IP-R', 'PCFTV')))
-param.MW = np.append(param.MW, np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IP-R', 'MW')))
-param.r = np.append(param.r, np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IP-R', 'PCFTR')))
+param.m = np.append(param.m, np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IB-R', 'PCFTR')))
+param.e = np.append(param.e, np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IB-R', 'PCFTU')))
+param.s = np.append(param.s, np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IB-R', 'PCFTV')))
+param.MW = np.append(param.MW, np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IB-R', 'MW')))
+param.r = np.append(param.r, np.float32(properties_package.pcsaft.retrive_param_from_DB('seg-IB-R', 'PCFTR')))
 
 param.k_ij = np.zeros([len(component_list), len(component_list)])
 # print(param.m)
@@ -55,8 +58,8 @@ param.k_ij = np.zeros([len(component_list), len(component_list)])
 # for c in GlobalComponentManager.component_list:
 #     print(c.name)
 reaction_set_1 = ReactionSet()
-kinetic = {'ka': 0.0019, 'ki(1)': 0.001, 'ki(2)': 0, 'ki(3)': 0.0, 'kp(1)': 996, 'kp(2)': 0, 'kp(3)': 0.0,
-           'ktm(1)': 0.28, 'ktm(2)': 0.0, 'ktm(3)': 0.0, 'kd(1)': 0.04, 'kd(2)': 0.0, 'kd(3)': 0.0}
+kinetic = {'ka': 0.01, 'ki(1)': 0.00, 'ki(2)': 0, 'ki(3)': 0.0, 'kp(1)': 0, 'kp(2)': 0, 'kp(3)': 0.0,
+           'ktm(1)': 0., 'ktm(2)': 0.0, 'ktm(3)': 0.0, 'kd(1)': 0., 'kd(2)': 0.0, 'kd(3)': 0.0}
 
 # IB + ion-pair ——> P1[1] + counter-ion
 reaction_set_1.source_define(0, [0, 6], {'name': 'Ki(1)', 'value': kinetic['ki(1)']}, [1, 1], [1, 1], True)
@@ -323,37 +326,67 @@ flow_toR130 = Flow(100, 103, 'to_R130')
 flow_toR130.set_MassFlow_conventional(
     {'IB': 4070., 'IP': 0, 'HCL': 0.47, 'EADC': 12, 'HEXANE': 150, 'CH3CL': 8600})
 flow_outR130 = Flow(t=0, p=101, name='R130_out')
-reactor = CstrSingleLiqPhase(198., 10132500., 24, flow_toR130, reaction_set_1, properties_package)
 
-model = pyo.ConcreteModel()
+reactor = CstrSingleLiqPhase(198., 10132500., 3, flow_toR130, reaction_set_1, properties_package)
+model1 = ReactorModel("R130", reactor, flow_toR130)
 
-comp_names = [c.name for c in GlobalComponentManager.component_list]
-init_values = {v: flow_toR130.comp_dict[v]['mole_flow'] + 1e-6 for v in flow_toR130.comp_dict}
-model.outflows = pyo.Var(comp_names, initialize=init_values, domain=pyo.NonNegativeReals)
+reactor2 = CstrSingleLiqPhase(198., 10132500., 3, model1.outlet_flow, reaction_set_1, properties_package)
+model2 = ReactorModel("R130-2", reactor2, model1.outlet_flow)
 
-for c in flow_outR130.comp_dict:
-    flow_outR130.comp_dict[c]['mole_flow'] = model.outflows[c]
+reactor3 = CstrSingleLiqPhase(198., 10132500., 3, model2.outlet_flow, reaction_set_1, properties_package)
+model3 = ReactorModel("R130-3", reactor3, model2.outlet_flow)
 
-model.eqs = pyo.ConstraintList()
+reactor4 = CstrSingleLiqPhase(198., 10132500., 3, model3.outlet_flow, reaction_set_1, properties_package)
+model4 = ReactorModel("R130-4", reactor4, model3.outlet_flow)
 
-for eq in reactor.mass_balance(flow_outR130):
-    model.eqs.add(eq == 0.)
+tubeR = PFRSingleliqPhase(198, 10132500, 4, 5, flow_toR130, reaction_set_1, properties_package)
+tube_model = ReactorModel_PFR('tube', tubeR, inlet_flow=flow_toR130)
 
-solver = SolverFactory('ipopt')
-results = solver.solve(model, tee=True)
+# solve_manager = SolverManager()
+# solve_manager.add_model(model1)
+# solve_manager.add_model(model2)
+# solve_manager.add_model(model3)
+# solve_manager.add_model(model4)
+# result = solve_manager.solve_sequence()
+# PostProcess.process_results(result)
+# IB_flow = []
+# act_sp = []
+# for i in result:
+#     IB_flow.append((flow_toR130.comp_dict['IB']['mole_flow']-i['outflows']['IB'])/flow_toR130.comp_dict['IB']['mole_flow'])
+#     act_sp.append(i['outflows']['p1_ion[1]'])
+# plt.plot(act_sp)
+# plt.show()
 
-if (results.solver.status == pyo.SolverStatus.ok) and (
-        results.solver.termination_condition == pyo.TerminationCondition.optimal):
-    print("Optimal solution found.")
-    for name in comp_names:
-        print(f"{name}: {pyo.value(model.outflows[name])}")
-    print("MWN: " + str(
-        (pyo.value(model.outflows['first_mom_live[1]'])+pyo.value(model.outflows['first_mom_dead[1]'])) / (pyo.value(model.outflows['zeroth_mom_dead[1]'])+pyo.value(model.outflows['zeroth_mom_dead[1]'])) * 56))
-    print("IB进料量：" + str(flow_toR130.comp_dict['IB']['mole_flow']))
-    print("转化率: " + str(
-        (flow_toR130.comp_dict['IB']['mole_flow'] - pyo.value(model.outflows['IB'])) / flow_toR130.comp_dict['IB'][
-            'mole_flow'] * 100))
-else:
-    print("Solver did not find an optimal solution.")
 
-print(str(pyo.value(model.outflows['first_mom_live[1]']) + pyo.value(model.outflows['first_mom_dead[1]'])))
+# model = pyo.ConcreteModel()
+#
+# comp_names = [c.name for c in GlobalComponentManager.component_list]
+# init_values = {v: flow_toR130.comp_dict[v]['mole_flow'] + 1e-6 for v in flow_toR130.comp_dict}
+# model.outflows = pyo.Var(comp_names, initialize=init_values, domain=pyo.NonNegativeReals)
+#
+# for c in flow_outR130.comp_dict:
+#     flow_outR130.comp_dict[c]['mole_flow'] = model.outflows[c]
+#
+# model.eqs = pyo.ConstraintList()
+#
+# for eq in reactor.mass_balance(flow_outR130):
+#     model.eqs.add(eq == 0.)
+#
+# solver = SolverFactory('ipopt')
+# results = solver.solve(model, tee=True)
+#
+# if (results.solver.status == pyo.SolverStatus.ok) and (
+#         results.solver.termination_condition == pyo.TerminationCondition.optimal):
+#     print("Optimal solution found.")
+#     for name in comp_names:
+#         print(f"{name}: {pyo.value(model.outflows[name])}")
+#     print("MWN: " + str(
+#         (pyo.value(model.outflows['first_mom_live[1]'])+pyo.value(model.outflows['first_mom_dead[1]'])) / (pyo.value(model.outflows['zeroth_mom_dead[1]'])+pyo.value(model.outflows['zeroth_mom_dead[1]'])) * 56))
+#     print("IB进料量：" + str(flow_toR130.comp_dict['IB']['mole_flow']))
+#     print("转化率: " + str(
+#         (flow_toR130.comp_dict['IB']['mole_flow'] - pyo.value(model.outflows['IB'])) / flow_toR130.comp_dict['IB'][
+#             'mole_flow'] * 100))
+# else:
+#     print("Solver did not find an optimal solution.")
+#
+# print(str(pyo.value(model.outflows['first_mom_live[1]']) + pyo.value(model.outflows['first_mom_dead[1]'])))

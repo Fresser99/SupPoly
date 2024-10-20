@@ -32,7 +32,7 @@ class DeconvolutionHelper:
             param_name.append('s' + str(cite))
             param_name.append('mu' + str(cite))
         initial_guess = {
-            'A0': max(self.Y), 'A1': max(self.Y)/1.5, 'A2': max(self.Y)/2,
+            'A0': max(self.Y), 'A1': max(self.Y)/2, 'A2': max(self.Y)/3,
             'mu0': 0.,
             'mu1': 0.,
             'mu2': 0.,
@@ -45,10 +45,8 @@ class DeconvolutionHelper:
             model.constraints.add(model.param['A0'] >= 0.0)
             model.constraints.add(model.param['A1'] >= 0.0)
             model.constraints.add(model.param['A2'] >= 0.0)
-            model.constraints.add(model.param['A0'] <= 1.0)
-            model.constraints.add(model.param['A1'] <= 1.0)
-            model.constraints.add(model.param['A2'] <= 1.0)
-            model.constraints.add(model.param['s' + str(i)] >= 0.2)
+            model.constraints.add(model.param['A0']+model.param['A1']+model.param['A2'] == 1)
+            model.constraints.add(model.param['s' + str(i)] >= 0)
             model.constraints.add(model.param['mu' + str(i)] >= min(self.MW))
             model.constraints.add(model.param['mu' + str(i)] <= max(self.MW))
 
@@ -69,8 +67,8 @@ class DeconvolutionHelper:
         peak2 = np.array([pyo.value(i) for i in self.gaussian(model, 1)])
         peak3 = np.array([pyo.value(i) for i in self.gaussian(model, 2)])
         # print([pyo.value(i) for i in self.gaussian(model, 0)])
-        # plt.plot(peak1 + peak2 + peak3)
-        # plt.plot(self.Y)
+        plt.plot(peak1 + peak2 + peak3)
+        plt.plot(self.Y,'*')
         plt.plot(peak1)
         plt.plot(peak2)
         plt.plot(peak3)

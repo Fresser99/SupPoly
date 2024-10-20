@@ -33,3 +33,4 @@ class Flow:
         for idx, c in enumerate(self.comp_dict):
             self.comp_dict[c]['mole_flow'] = self.comp_dict[c]['mass_flow'] / GlobalComponentManager.component_list[
                 idx].MW if self.comp_dict[c]['polymer_flow_momentum'] == -2 else 0.0
+
