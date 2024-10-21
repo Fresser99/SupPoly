@@ -10,7 +10,7 @@ import pyomo.environ as pyo
 
 class CstrSingleLiqPhase:
 
-    def __init__(self, t, p, v, inflow: Flow, rx_set: ReactionSet, prop: PropertiesMethod):
+    def __init__(self, t, p, v, inflow: Flow, rx_set: ReactionSet, prop: PropertiesMethod, q_spec=0):
 
         self.ReactionSet = rx_set
         self.Inflow = inflow
@@ -18,6 +18,7 @@ class CstrSingleLiqPhase:
         self.Temperature = t
         self.Pressure = p
         self.Volume = v
+        self.q_spec = q_spec
 
     def mass_balance(self, Outflow: Flow):
 
@@ -64,13 +65,15 @@ class CstrSingleLiqPhase:
                                                                        self.PropertiesMethod.param,
                                                                        mole_frac_properties, mole_frac_properties[-1],
                                                                        dpn)
-
-        q_out = np.sum(Mole_flow_first) * 1000 / vm_liq
+        if self.q_spec != 0:
+            q_out = np.sum(Mole_flow_first) * 1000 / self.q_spec
+        else:
+            q_out = np.sum(Mole_flow_first) * 1000 / vm_liq
 
         concentration = np.array([Outflow.comp_dict[c]['mole_flow'] / q_out for c in Outflow.comp_dict])
 
         for f in self.Inflow.comp_dict:
-            print(f+": "+str(pyo.value(self.ReactionSet.calculate_rate(f, concentration))*self.Volume*3600))
+            print(f + ": " + str(pyo.value(self.ReactionSet.calculate_rate(f, concentration)) * self.Volume * 3600))
             eq = self.Inflow.comp_dict[f]['mole_flow'] - Outflow.comp_dict[f][
                 'mole_flow'] + self.ReactionSet.calculate_rate(f,
                                                                concentration) * self.Volume * 3600
@@ -81,19 +84,16 @@ class CstrSingleLiqPhase:
 
 class PFRSingleliqPhase:
 
-    def __init__(self, t, p, l, area, inflow: Flow, rx_set: ReactionSet, prop: PropertiesMethod):
+    def __init__(self, t, p, l, D, inflow: Flow, rx_set: ReactionSet, prop: PropertiesMethod):
         self.ReactionSet = rx_set
         self.Inflow = inflow
         self.PropertiesMethod = prop
         self.Temperature = t
         self.Pressure = p
-        self.Area = area
+        self.Area = D
         self.Length = l
 
     def mass_balance(self, model, comp, z):
-
         concentrations = [model.C[c, z] for c in model.comps]
         rate = self.ReactionSet.calculate_rate(comp, concentrations)
-        return model.dFdz[comp, z] == rate * self.Area*3600
-
-
+        return model.dFdz[comp, z] == rate * self.Area * 3600

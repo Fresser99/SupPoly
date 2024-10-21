@@ -13,6 +13,7 @@ from pcsaft.pcsaft import *
 import pyomo.environ as pyo
 from solvermanage import *
 import matplotlib.pyplot as plt
+from OperationUnit import *
 
 site_num = 3
 
@@ -58,8 +59,8 @@ param.k_ij = np.zeros([len(component_list), len(component_list)])
 # for c in GlobalComponentManager.component_list:
 #     print(c.name)
 reaction_set_1 = ReactionSet()
-kinetic = {'ka': 0.01, 'ki(1)': 0.00, 'ki(2)': 0, 'ki(3)': 0.0, 'kp(1)': 0, 'kp(2)': 0, 'kp(3)': 0.0,
-           'ktm(1)': 0., 'ktm(2)': 0.0, 'ktm(3)': 0.0, 'kd(1)': 0., 'kd(2)': 0.0, 'kd(3)': 0.0}
+kinetic = {'ka': 0.0018, 'ki(1)': 0.0002, 'ki(2)': 0, 'ki(3)': 0.0, 'kp(1)': 981.1, 'kp(2)': 0, 'kp(3)': 0.0,
+           'ktm(1)': 0.3, 'ktm(2)': 0.0, 'ktm(3)': 0.0, 'kd(1)': 0.01, 'kd(2)': 0.0, 'kd(3)': 0.0}
 
 # IB + ion-pair ——> P1[1] + counter-ion
 reaction_set_1.source_define(0, [0, 6], {'name': 'Ki(1)', 'value': kinetic['ki(1)']}, [1, 1], [1, 1], True)
@@ -321,13 +322,20 @@ reaction_set_1.source_define(28, [11, 28], {'name': 'Kd(2)', 'value': 0.0}, [1, 
 # Y0[3] + counter-ion ——> D0[3] + ion-pair
 reaction_set_1.source_define(28, [12, 28], {'name': 'Kd(3)', 'value': 0.0}, [1, 1], [1, 1], True)
 
-reaction_set_1.preview_reaction_equations()
+# reaction_set_1.preview_reaction_equations()
+
+tear_flow = {cmp.name: 0.0 for cmp in GlobalComponentManager.component_list}
+returnflow = {cmp.name: 0.0 for cmp in GlobalComponentManager.component_list}
 flow_toR130 = Flow(100, 103, 'to_R130')
 flow_toR130.set_MassFlow_conventional(
     {'IB': 4070., 'IP': 0, 'HCL': 0.47, 'EADC': 12, 'HEXANE': 150, 'CH3CL': 8600})
-flow_outR130 = Flow(t=0, p=101, name='R130_out')
 
-reactor = CstrSingleLiqPhase(198., 10132500., 3, flow_toR130, reaction_set_1, properties_package)
+
+
+for comps in flow_toR130.comp_dict:
+    flow_toR130.comp_dict[comps]['mole_flow'] += tear_flow[comps]
+
+reactor = CstrSingleLiqPhase(198., 10132500., 3, flow_toR130, reaction_set_1, properties_package,q_spec=6000)
 model1 = ReactorModel("R130", reactor, flow_toR130)
 
 reactor2 = CstrSingleLiqPhase(198., 10132500., 3, model1.outlet_flow, reaction_set_1, properties_package)
@@ -339,31 +347,167 @@ model3 = ReactorModel("R130-3", reactor3, model2.outlet_flow)
 reactor4 = CstrSingleLiqPhase(198., 10132500., 3, model3.outlet_flow, reaction_set_1, properties_package)
 model4 = ReactorModel("R130-4", reactor4, model3.outlet_flow)
 
-tubeR = PFRSingleliqPhase(198, 10132500, 4, 5, flow_toR130, reaction_set_1, properties_package)
-tube_model = ReactorModel_PFR('tube', tubeR, inlet_flow=flow_toR130)
-
-# solve_manager = SolverManager()
-# solve_manager.add_model(model1)
-# solve_manager.add_model(model2)
-# solve_manager.add_model(model3)
-# solve_manager.add_model(model4)
-# result = solve_manager.solve_sequence()
-# PostProcess.process_results(result)
+solve_manager = SolverManager()
+solve_manager.add_model(model1)
+solve_manager.add_model(model2)
+solve_manager.add_model(model3)
+solve_manager.add_model(model4)
+# solve_manager.add_model(tube_model)
+result = solve_manager.solve_sequence()
+PostProcess.process_results(result)
 # IB_flow = []
 # act_sp = []
 # for i in result:
-#     IB_flow.append((flow_toR130.comp_dict['IB']['mole_flow']-i['outflows']['IB'])/flow_toR130.comp_dict['IB']['mole_flow'])
+#     IB_flow.append(i['outflows']['IB'])
 #     act_sp.append(i['outflows']['p1_ion[1]'])
+# print(IB_flow)
 # plt.plot(act_sp)
 # plt.show()
 
+# print(pyo.value(model4.outlet_flow.comp_dict['IB']['mole_flow']))
 
-# model = pyo.ConcreteModel()
-#
+spliter_0 = Spliter(model4.outlet_flow, [0.001453043, 0.418959329, 0.274750957, 0.143179036, 0.161657635])
+spliter_0.mass_balance()
+tubeR = PFRSingleliqPhase(198, 10132500, 3.1, 0.18372636, spliter_0.split_Out_flow_list[1], reaction_set_1,
+                          properties_package)
+tube_model = ReactorModel_PFR('tube_outer_1', tubeR, inlet_flow=spliter_0.split_Out_flow_list[1])
+solve_manager2 = SolverManager()
+solve_manager2.add_model(tube_model)
+res = solve_manager2.solve_sequence()
+PostProcess.process_results(res)
+
+tubeR_2 = PFRSingleliqPhase(198, 10132500, 3.1, 0.1836915, spliter_0.split_Out_flow_list[2], reaction_set_1,
+                            properties_package)
+tube_model_2 = ReactorModel_PFR('tube_outer_2', tubeR_2, inlet_flow=spliter_0.split_Out_flow_list[2])
+discretizer = pyo.TransformationFactory('dae.finite_difference')
+discretizer.apply_to(tube_model_2.model, nfe=50, scheme='BACKWARD')
+solver2 = SolverFactory('ipopt')
+solver2.solve(tube_model_2.model)
+tubeR_3 = PFRSingleliqPhase(198, 10132500, 3.1, 0.12245611, spliter_0.split_Out_flow_list[3], reaction_set_1,
+                            properties_package)
+tube_model_3 = ReactorModel_PFR('tube_inner_1', tubeR_3, inlet_flow=spliter_0.split_Out_flow_list[3])
+discretizer = pyo.TransformationFactory('dae.finite_difference')
+discretizer.apply_to(tube_model_3.model, nfe=50, scheme='BACKWARD')
+solver2 = SolverFactory('ipopt')
+solver2.solve(tube_model_3.model)
+
+tubeR_4 = PFRSingleliqPhase(198, 10132500, 3.1, 0.12246347, spliter_0.split_Out_flow_list[4], reaction_set_1,
+                            properties_package)
+tube_model_4 = ReactorModel_PFR('tube_inner_2', tubeR_4, inlet_flow=spliter_0.split_Out_flow_list[4])
+discretizer = pyo.TransformationFactory('dae.finite_difference')
+discretizer.apply_to(tube_model_4.model, nfe=50, scheme='BACKWARD')
+solver2 = SolverFactory('ipopt')
+solver2.solve(tube_model_4.model)
+
+# plt.plot(pyo.value(tube_model.model.F['IB', :]))
+# plt.plot(pyo.value(tube_model_2.model.F['IB', :]))
+# plt.plot(pyo.value(tube_model_3.model.F['IB', :]))
+# plt.plot(pyo.value(tube_model_4.model.F['IB', :]))
+# plt.show()
+
+mixer = Mixer(
+    [tube_model.outlet_flow, tube_model_2.outlet_flow, tube_model_3.outlet_flow, tube_model_4.outlet_flow])
+mixer.mass_balance()
+
+for cmm in mixer.split_Out_flow.comp_dict:
+    returnflow[cmm]=mixer.split_Out_flow.comp_dict[cmm]['mole_flow']
+
+while np.sum(np.array([(tear_flow[c.name] - returnflow[c.name]) ** 2 for c in GlobalComponentManager.component_list]))>= 1e-12:
+    tear_flow = returnflow
+    for comps in flow_toR130.comp_dict:
+        flow_toR130.comp_dict[comps]['mole_flow'] += tear_flow[comps]
+
+    reactor = CstrSingleLiqPhase(198., 10132500., 2.8047, flow_toR130, reaction_set_1, properties_package,q_spec=6000)
+    model1 = ReactorModel("R130", reactor, flow_toR130)
+
+    reactor2 = CstrSingleLiqPhase(198., 10132500., 3, model1.outlet_flow, reaction_set_1, properties_package,q_spec=6000)
+    model2 = ReactorModel("R130-2", reactor2, model1.outlet_flow)
+
+    reactor3 = CstrSingleLiqPhase(198., 10132500., 3, model2.outlet_flow, reaction_set_1, properties_package,q_spec=6000)
+    model3 = ReactorModel("R130-3", reactor3, model2.outlet_flow)
+
+    reactor4 = CstrSingleLiqPhase(198., 10132500., 2.8047, model3.outlet_flow, reaction_set_1, properties_package,q_spec=6000)
+    model4 = ReactorModel("R130-4", reactor4, model3.outlet_flow)
+
+    solve_manager = SolverManager()
+    solve_manager.add_model(model1)
+    solve_manager.add_model(model2)
+    solve_manager.add_model(model3)
+    solve_manager.add_model(model4)
+    # solve_manager.add_model(tube_model)
+    result = solve_manager.solve_sequence()
+    # PostProcess.process_results(result)
+    # IB_flow = []
+    # act_sp = []
+    # for i in result:
+    #     IB_flow.append(i['outflows']['IB'])
+    #     act_sp.append(i['outflows']['p1_ion[1]'])
+    # print(IB_flow)
+    # plt.plot(act_sp)
+    # plt.show()
+
+    # print(pyo.value(model4.outlet_flow.comp_dict['IB']['mole_flow']))
+
+    spliter_0 = Spliter(model4.outlet_flow, [0.001453043, 0.418959329, 0.274750957, 0.143179036, 0.161657635])
+    spliter_0.mass_balance()
+    # print(pyo.value(spliter_0.split_Out_flow_list[0].comp_dict['IP']['mole_flow']))
+    tubeR = PFRSingleliqPhase(198, 10132500, 3.1, 0.18372636, spliter_0.split_Out_flow_list[1], reaction_set_1,
+                              properties_package)
+    tube_model = ReactorModel_PFR('tube_outer_1', tubeR, inlet_flow=spliter_0.split_Out_flow_list[1])
+    solve_manager2 = SolverManager()
+    solve_manager2.add_model(tube_model)
+    res = solve_manager2.solve_sequence()
+    PostProcess.process_results(res)
+
+    tubeR_2 = PFRSingleliqPhase(198, 10132500, 3.1, 0.1836915, spliter_0.split_Out_flow_list[2], reaction_set_1,
+                                properties_package)
+    tube_model_2 = ReactorModel_PFR('tube_outer_2', tubeR_2, inlet_flow=spliter_0.split_Out_flow_list[2])
+    discretizer = pyo.TransformationFactory('dae.finite_difference')
+    discretizer.apply_to(tube_model_2.model, nfe=50, scheme='BACKWARD')
+    solver2 = SolverFactory('ipopt')
+    solver2.solve(tube_model_2.model)
+    # print(tube_model_2.outlet_flow.comp_dict)
+    tubeR_3 = PFRSingleliqPhase(198, 10132500, 3.1, 0.12245611, spliter_0.split_Out_flow_list[3], reaction_set_1,
+                                properties_package)
+    tube_model_3 = ReactorModel_PFR('tube_inner_1', tubeR_3, inlet_flow=spliter_0.split_Out_flow_list[3])
+    discretizer = pyo.TransformationFactory('dae.finite_difference')
+    discretizer.apply_to(tube_model_3.model, nfe=50, scheme='BACKWARD')
+    solver2 = SolverFactory('ipopt')
+    solver2.solve(tube_model_3.model)
+
+    tubeR_4 = PFRSingleliqPhase(198, 10132500, 3.1, 0.12246347, spliter_0.split_Out_flow_list[4], reaction_set_1,
+                                properties_package)
+    tube_model_4 = ReactorModel_PFR('tube_inner_2', tubeR_4, inlet_flow=spliter_0.split_Out_flow_list[4])
+    discretizer = pyo.TransformationFactory('dae.finite_difference')
+    discretizer.apply_to(tube_model_4.model, nfe=50, scheme='BACKWARD')
+    solver2 = SolverFactory('ipopt')
+    solver2.solve(tube_model_4.model)
+
+    # plt.plot(pyo.value(tube_model.model.F['IB', :]))
+    # plt.plot(pyo.value(tube_model_2.model.F['IB', :]))
+    # plt.plot(pyo.value(tube_model_3.model.F['IB', :]))
+    # plt.plot(pyo.value(tube_model_4.model.F['IB', :]))
+    # plt.show()
+
+    mixer = Mixer(
+        [tube_model.outlet_flow, tube_model_2.outlet_flow, tube_model_3.outlet_flow, tube_model_4.outlet_flow])
+    mixer.mass_balance()
+
+    for f in mixer.inlet_flow_list:
+        print(f.comp_dict)
+
+    for cmm in mixer.split_Out_flow.comp_dict:
+        returnflow[cmm] = mixer.split_Out_flow.comp_dict[cmm]['mole_flow']
+
+    print(np.sum(np.array([(tear_flow[c.name] - returnflow[c.name]) ** 2 for c in GlobalComponentManager.component_list])))
 # comp_names = [c.name for c in GlobalComponentManager.component_list]
 # init_values = {v: flow_toR130.comp_dict[v]['mole_flow'] + 1e-6 for v in flow_toR130.comp_dict}
 # model.outflows = pyo.Var(comp_names, initialize=init_values, domain=pyo.NonNegativeReals)
-#
+
+print()
+print(tear_flow)
+print(returnflow)
+
 # for c in flow_outR130.comp_dict:
 #     flow_outR130.comp_dict[c]['mole_flow'] = model.outflows[c]
 #

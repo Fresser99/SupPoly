@@ -53,6 +53,7 @@ class ReactorModel_PFR:
         comp_names = [c.name for c in GlobalComponentManager.component_list]
         self.model.comps = pyo.Set(initialize=comp_names)
 
+
         def initialize_F(model, comp, z):
             if z == 0:
                 return self.inlet_flow.comp_dict[comp]['mole_flow']+1e-32
@@ -62,7 +63,8 @@ class ReactorModel_PFR:
         self.model.dFdz = dae.DerivativeVar(self.model.F, wrt=self.model.z)
 
         self.model.initial_flow_constraint = pyo.ConstraintList()
-
+        for c in self.outlet_flow.comp_dict:
+            self.outlet_flow.comp_dict[c]['mole_flow'] = pyo.value(self.model.F[c, self.model.z.last()])
         for comp in self.model.comps:
 
             self.model.initial_flow_constraint.add(
@@ -128,7 +130,6 @@ class ReactorModel_PFR:
                                                                                    mole_frac_properties,
                                                                                    mole_frac_properties[-1],
                                                                                    self.model.dpn[z])/1000
-            print(pyo.value(vm_liq))
 
             return vm_liq
 
@@ -142,11 +143,14 @@ class ReactorModel_PFR:
 
     def solve(self, solver):
         discretizer = pyo.TransformationFactory('dae.finite_difference')
-        discretizer.apply_to(self.model, nfe=30, scheme='BACKWARD')
+        discretizer.apply_to(self.model, nfe=50, scheme='BACKWARD')
         results = solver.solve(self.model, tee=True)
         if (results.solver.status == pyo.SolverStatus.ok) and (
                 results.solver.termination_condition == pyo.TerminationCondition.optimal):
-            return {name: pyo.value(self.model.F[name, -1]) for name in self.model.comps}
+
+
+
+            return {name: pyo.value(self.model.F[name, self.model.z.last()]) for name in self.model.comps}
         else:
             raise RuntimeError(f"Solver failed to find an optimal solution for {self.name}")
 
@@ -156,7 +160,7 @@ class SolverManager:
         self.model_sequence: List[ReactorModel] = []
         self.solver = SolverFactory('ipopt')
 
-    def add_model(self, model: ReactorModel):
+    def add_model(self, model):
         self.model_sequence.append(model)
 
     def solve_sequence(self) -> List[Dict[str, Any]]:
