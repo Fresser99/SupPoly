@@ -53,7 +53,7 @@ param.r = np.append(param.r, np.float32(properties_package.pcsaft.retrive_param_
 param.k_ij = np.zeros([len(component_list), len(component_list)])
 
 reaction_set_1 = ReactionSet()
-kinetic = {'ka': 0, 'ki(1)': 0, 'ki(2)': 0, 'ki(3)': 0.0, 'kp(1)': 0, 'kp(2)': 0, 'kp(3)': 0.0,
+kinetic = {'ka': 0, 'kgit config --global --add safe.directory E:/project/UC-BMSi(1)': 0, 'ki(2)': 0, 'ki(3)': 0.0, 'kp(1)': 0, 'kp(2)': 0, 'kp(3)': 0.0,
            'ktm(1)': 0, 'ktm(2)': 0.0, 'ktm(3)': 0.0, 'kd(1)': 0.0, 'kd(2)': 0.0, 'kd(3)': 0.0}
 
 # IB + ion-pair ——> P1[1] + counter-ion
