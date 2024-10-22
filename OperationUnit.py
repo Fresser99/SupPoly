@@ -13,7 +13,7 @@ class Mixer:
         for c in self.split_Out_flow.comp_dict:
             mix_flow = 0.0
             for idx_flow, flow in enumerate(self.inlet_flow_list):
-                mix_flow = mix_flow + pyo.value(flow.comp_dict[c]['mole_flow'])
+                mix_flow = mix_flow + flow.comp_dict[c]['mole_flow']
             self.split_Out_flow.comp_dict[c]['mole_flow'] = mix_flow
 
 

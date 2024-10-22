@@ -73,7 +73,7 @@ class CstrSingleLiqPhase:
         concentration = np.array([Outflow.comp_dict[c]['mole_flow'] / q_out for c in Outflow.comp_dict])
 
         for f in self.Inflow.comp_dict:
-            print(f + ": " + str(pyo.value(self.ReactionSet.calculate_rate(f, concentration)) * self.Volume * 3600))
+            #print(f + ": " + str(pyo.value(self.ReactionSet.calculate_rate(f, concentration)) * self.Volume * 3600))
             eq = self.Inflow.comp_dict[f]['mole_flow'] - Outflow.comp_dict[f][
                 'mole_flow'] + self.ReactionSet.calculate_rate(f,
                                                                concentration) * self.Volume * 3600

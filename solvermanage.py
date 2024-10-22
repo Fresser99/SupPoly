@@ -30,7 +30,7 @@ class ReactorModel:
             self.model.eqs.add(eq == 0.)
 
     def solve(self, solver):
-        results = solver.solve(self.model, tee=True)
+        results = solver.solve(self.model, tee=False)
         if (results.solver.status == pyo.SolverStatus.ok) and (
                 results.solver.termination_condition == pyo.TerminationCondition.optimal):
             return {name: pyo.value(self.model.outflows[name]) for name in self.model.outflows}
@@ -144,7 +144,7 @@ class ReactorModel_PFR:
     def solve(self, solver):
         discretizer = pyo.TransformationFactory('dae.finite_difference')
         discretizer.apply_to(self.model, nfe=50, scheme='BACKWARD')
-        results = solver.solve(self.model, tee=True)
+        results = solver.solve(self.model, tee=False)
         if (results.solver.status == pyo.SolverStatus.ok) and (
                 results.solver.termination_condition == pyo.TerminationCondition.optimal):
 
@@ -170,7 +170,7 @@ class SolverManager:
                 # Update inlet flow of current model with outlet flow of previous model
                 for c in model.inlet_flow.comp_dict:
                     model.inlet_flow.comp_dict[c]['mole_flow'] = results[-1]['outflows'][c]
-                model.setup_model()  # Reinitialize the model with new inlet conditions
+                #model.setup_model()  # Reinitialize the model with new inlet conditions
 
             model_results = model.solve(self.solver)
             results.append({'name': model.name, 'outflows': model_results, 'inlet_flow': model.inlet_flow})
