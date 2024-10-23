@@ -71,12 +71,25 @@ class CstrSingleLiqPhase:
             q_out = np.sum(Mole_flow_first) * 1000 / vm_liq
 
         concentration = np.array([Outflow.comp_dict[c]['mole_flow'] / q_out for c in Outflow.comp_dict])
-
+        scaling_factors = {}
         for f in self.Inflow.comp_dict:
-            eq = self.Inflow.comp_dict[f]['mole_flow'] - Outflow.comp_dict[f][
-                'mole_flow'] + self.ReactionSet.calculate_rate(f,
-                                                               concentration) * self.Volume * 3600
-            mb_eq.append(eq)
+            # 计算每个反应速率的预估值
+            rate_estimate = abs(self.ReactionSet.calculate_rate(f, concentration)) * self.Volume * 3600
+            # 计算缩放因子，这里使用最大值的倒数，防止除零
+            inflow = abs(self.Inflow.comp_dict[f]['mole_flow'])
+            outflow = abs(Outflow.comp_dict[f]['mole_flow'])
+            max_value = max(pyo.value(inflow), pyo.value(outflow), pyo.value(rate_estimate), 1e-8)
+            scaling_factors[f] = 1.0 / max_value
+        for f in self.Inflow.comp_dict:
+            # 原始方程
+            eq = (self.Inflow.comp_dict[f]['mole_flow'] - Outflow.comp_dict[f]['mole_flow'] +
+                  self.ReactionSet.calculate_rate(f, concentration) * self.Volume * 3600)
+            # 应用缩放因子
+            scaled_eq = scaling_factors[f] * eq
+            mb_eq.append(scaled_eq)
+
+        return mb_eq
+        mb_eq.append(eq)
 
         return mb_eq
 

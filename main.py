@@ -1,4 +1,5 @@
 from pyomo import dae
+from pyomo.common.enums import minimize
 from pyomo.opt import SolverFactory
 
 import componentmanager
@@ -53,10 +54,17 @@ param.r = np.append(param.r, np.float32(properties_package.pcsaft.retrive_param_
 param.k_ij = np.zeros([len(component_list), len(component_list)])
 
 reaction_set_1 = ReactionSet()
-kinetic = {'ka': 0.00001, 'ki(1)': 0.00001, 'ki(2)': 0, 'ki(3)': 0.0, 'kp(1)': 0.99, 'kp(2)': 0, 'kp(3)': 0.0,
-           'ktm(1)': 0.0001, 'ktm(2)': 0.0, 'ktm(3)': 0.0, 'kd(1)': 0.00004, 'kd(2)': 0.0, 'kd(3)': 0.0}
 
-param
+param_estimation_problem = pyo.ConcreteModel()
+param_estimation_problem.estimated_param = pyo.Var(['ka', 'ki(1)', 'kp(1)', 'ktm(1)', 'kd(1)'],
+                                                   domain=pyo.NonNegativeReals,
+                                                   initialize={'ka': 0, 'ki(1)': 0.1, 'kp(1)': 0.0001,
+                                                               'ktm(1)': 0.000001, 'kd(1)': 0.000000002})
+kinetic = {'ka': param_estimation_problem.estimated_param['ka'],
+           'ki(1)': param_estimation_problem.estimated_param['ki(1)'], 'ki(2)': 0, 'ki(3)': 0.0,
+           'kp(1)': param_estimation_problem.estimated_param['kp(1)'], 'kp(2)': 0, 'kp(3)': 0.0,
+           'ktm(1)': param_estimation_problem.estimated_param['ktm(1)'], 'ktm(2)': 0.0, 'ktm(3)': 0.0,
+           'kd(1)': param_estimation_problem.estimated_param['kd(1)'], 'kd(2)': 0.0, 'kd(3)': 0.0}
 
 # IB + ion-pair ——> P1[1] + counter-ion
 reaction_set_1.source_define(0, [0, 6], {'name': 'Ki(1)', 'value': kinetic['ki(1)']}, [1, 1], [1, 1], True)
@@ -318,24 +326,30 @@ reaction_set_1.source_define(28, [11, 28], {'name': 'Kd(2)', 'value': 0.0}, [1, 
 # Y0[3] + counter-ion ——> D0[3] + ion-pair
 reaction_set_1.source_define(28, [12, 28], {'name': 'Kd(3)', 'value': 0.0}, [1, 1], [1, 1], True)
 # reaction_set_1.preview_reaction_equations()
-param_estimation_problem = pyo.ConcreteModel()
+
 flow_toR130 = Flow(100, 103, 'R130_InLet')
 flow_toR130.set_MassFlow_conventional(
-    {'IB': 4070., 'IP': 0, 'HCL': 0.47, 'EADC': 12, 'HEXANE': 150, 'CH3CL': 8600})
+    {'IB': 4070., 'IP': 0, 'HCL': 0.0054, 'EADC': 6, 'HEXANE': 150, 'CH3CL': 8600})
 component_index = [component for component in flow_toR130.comp_dict]
-init_values = {component: 1.0 for component in flow_toR130.comp_dict}
+init_values = {component: 100. for
+               component in flow_toR130.comp_dict}
+init_values_r = {component: 1000. for
+                 component in flow_toR130.comp_dict}
 param_estimation_problem.global_model = pyo.Block()
 # # global_model.tear_flow = pyo.Var(component_index,
 #                                  initialize=init_values,
 #                                  domain=pyo.NonNegativeReals)
-
+param_estimation_problem.global_model.tear_flow = pyo.Var(component_index, domain=pyo.NonNegativeReals,
+                                                          initialize=init_values_r)
 param_estimation_problem.global_model.reactor_1 = pyo.Block()
-param_estimation_problem.global_model.reactor_1.outflow = pyo.Var(component_index, initialize=init_values, domain=pyo.NonNegativeReals)
+param_estimation_problem.global_model.reactor_1.outflow = pyo.Var(component_index, initialize=init_values,
+                                                                  domain=pyo.NonNegativeReals)
 flow_to_reactor1 = Flow(198, 101325, 'to_reactor1')
 for c in flow_to_reactor1.comp_dict:
-    flow_to_reactor1.comp_dict[c]['mole_flow'] = flow_toR130.comp_dict[c]['mole_flow']
+    flow_to_reactor1.comp_dict[c]['mole_flow'] = flow_toR130.comp_dict[c]['mole_flow'] + \
+                                                 param_estimation_problem.global_model.tear_flow[c]
 
-reactor1_model = CstrSingleLiqPhase(198, 101325, 2.8, flow_to_reactor1, reaction_set_1, properties_package)
+reactor1_model = CstrSingleLiqPhase(198, 101325, 3.3, flow_to_reactor1, reaction_set_1, properties_package, q_spec=6000)
 Out_flow_reactor1 = Flow(reactor1_model.Temperature, reactor1_model.Pressure, 'OutFlow_reactor1')
 for c in Out_flow_reactor1.comp_dict:
     Out_flow_reactor1.comp_dict[c]['mole_flow'] = param_estimation_problem.global_model.reactor_1.outflow[c]
@@ -344,8 +358,10 @@ for eq in reactor1_model.mass_balance(Out_flow_reactor1):
     param_estimation_problem.global_model.reactor_1.mass_balance.add(eq == 0.)
 
 param_estimation_problem.global_model.reactor_2 = pyo.Block()
-param_estimation_problem.global_model.reactor_2.outflow = pyo.Var(component_index, initialize=init_values, domain=pyo.NonNegativeReals)
-reactor2_model = CstrSingleLiqPhase(198, 101325, 3, Out_flow_reactor1, reaction_set_1, properties_package)
+param_estimation_problem.global_model.reactor_2.outflow = pyo.Var(component_index, initialize=init_values,
+                                                                  domain=pyo.NonNegativeReals)
+reactor2_model = CstrSingleLiqPhase(198, 101325, 3.3, Out_flow_reactor1, reaction_set_1, properties_package,
+                                    q_spec=6000)
 Out_flow_reactor2 = Flow(reactor2_model.Temperature, reactor2_model.Pressure, 'OutFlow_reactor2')
 for c in Out_flow_reactor2.comp_dict:
     Out_flow_reactor2.comp_dict[c]['mole_flow'] = param_estimation_problem.global_model.reactor_2.outflow[c]
@@ -353,33 +369,38 @@ param_estimation_problem.global_model.reactor_2.mass_balance = pyo.ConstraintLis
 for eq in reactor2_model.mass_balance(Out_flow_reactor2):
     param_estimation_problem.global_model.reactor_2.mass_balance.add(eq == 0.)
 #
-param_estimation_problem.global_model.reactor_3 = pyo.Block()
-param_estimation_problem.global_model.reactor_3.outflow = pyo.Var(component_index, initialize=init_values, domain=pyo.NonNegativeReals)
-reactor3_model = CstrSingleLiqPhase(198, 101325, 3, Out_flow_reactor2, reaction_set_1, properties_package)
-Out_flow_reactor3 = Flow(reactor3_model.Temperature, reactor3_model.Pressure, 'OutFlow_reactor3')
-for c in Out_flow_reactor3.comp_dict:
-    Out_flow_reactor3.comp_dict[c]['mole_flow'] = param_estimation_problem.global_model.reactor_3.outflow[c]
-param_estimation_problem.global_model.reactor_3.mass_balance = pyo.ConstraintList()
-for eq in reactor3_model.mass_balance(Out_flow_reactor3):
-    param_estimation_problem.global_model.reactor_3.mass_balance.add(eq == 0.)
+# param_estimation_problem.global_model.reactor_3 = pyo.Block()
+# param_estimation_problem.global_model.reactor_3.outflow = pyo.Var(component_index, initialize=init_values,
+#                                                                   domain=pyo.NonNegativeReals)
+# reactor3_model = CstrSingleLiqPhase(198, 151325, 2, Out_flow_reactor2, reaction_set_1, properties_package)
+# Out_flow_reactor3 = Flow(reactor3_model.Temperature, reactor3_model.Pressure, 'OutFlow_reactor3')
+# for c in Out_flow_reactor3.comp_dict:
+#     Out_flow_reactor3.comp_dict[c]['mole_flow'] = param_estimation_problem.global_model.reactor_3.outflow[c]
+# param_estimation_problem.global_model.reactor_3.mass_balance = pyo.ConstraintList()
+# for eq in reactor3_model.mass_balance(Out_flow_reactor3):
+#     param_estimation_problem.global_model.reactor_3.mass_balance.add(eq == 0.)
+# #
+# param_estimation_problem.global_model.reactor_4 = pyo.Block()
+# param_estimation_problem.global_model.reactor_4.outflow = pyo.Var(component_index, initialize=init_values,
+#                                                                   domain=pyo.NonNegativeReals)
+# reactor4_model = CstrSingleLiqPhase(198, 101325, 2.8, Out_flow_reactor3, reaction_set_1, properties_package)
+# Out_flow_reactor4 = Flow(reactor4_model.Temperature, reactor4_model.Pressure, 'OutFlow_reactor4')
+# for c in Out_flow_reactor4.comp_dict:
+#     Out_flow_reactor4.comp_dict[c]['mole_flow'] = param_estimation_problem.global_model.reactor_4.outflow[c]
+# param_estimation_problem.global_model.reactor_4.mass_balance = pyo.ConstraintList()
+# for eq in reactor4_model.mass_balance(Out_flow_reactor4):
+#     param_estimation_problem.global_model.reactor_4.mass_balance.add(eq == 0.)
 #
-param_estimation_problem.global_model.reactor_4 = pyo.Block()
-param_estimation_problem.global_model.reactor_4.outflow = pyo.Var(component_index, initialize=init_values, domain=pyo.NonNegativeReals)
-reactor4_model = CstrSingleLiqPhase(198, 101325, 2.8, Out_flow_reactor3, reaction_set_1, properties_package)
-Out_flow_reactor4 = Flow(reactor4_model.Temperature, reactor4_model.Pressure, 'OutFlow_reactor4')
-for c in Out_flow_reactor4.comp_dict:
-    Out_flow_reactor4.comp_dict[c]['mole_flow'] = param_estimation_problem.global_model.reactor_4.outflow[c]
-param_estimation_problem.global_model.reactor_4.mass_balance = pyo.ConstraintList()
-for eq in reactor4_model.mass_balance(Out_flow_reactor4):
-    param_estimation_problem.global_model.reactor_4.mass_balance.add(eq == 0.)
-#
-spliter = Spliter(Out_flow_reactor4, [0.001453043, 0.418959329, 0.274750957, 0.143179036, 0.161657635])
+# spliter = Spliter(Out_flow_reactor2, [0.001453043, 0.418959329, 0.274750957, 0.143179036, 0.161657635])
+spliter = Spliter(Out_flow_reactor2, [0.001453043, 1 - 0.001453043])
 spliter.mass_balance()
 
 param_estimation_problem.global_model.pfr1 = pyo.Block()
 
-pfr1_model = PFRSingleliqPhase(t=198, p=101325, l=6.014, D=0.1837, inflow=spliter.split_Out_flow_list[1],
+pfr1_model = PFRSingleliqPhase(t=198, p=101325, l=6.014, D=0.6, inflow=spliter.split_Out_flow_list[1],
                                rx_set=reaction_set_1, prop=properties_package)
+
+
 def initialize_F(model, comp, z):
     if z == 0:
         return pfr1_model.Inflow.comp_dict[comp]['mole_flow']
@@ -388,35 +409,221 @@ def initialize_F(model, comp, z):
 
 
 param_estimation_problem.global_model.pfr1.z = dae.ContinuousSet(bounds=(0, pfr1_model.Length))
-param_estimation_problem.global_model.pfr1.F = pyo.Var(component_index, param_estimation_problem.global_model.pfr1.z, domain=pyo.NonNegativeReals,
-                              initialize=initialize_F)
-param_estimation_problem.global_model.pfr1.dFdz = dae.DerivativeVar(param_estimation_problem.global_model.pfr1.F, wrt=param_estimation_problem.global_model.pfr1.z)
+param_estimation_problem.global_model.pfr1.F = pyo.Var(component_index, param_estimation_problem.global_model.pfr1.z,
+                                                       domain=pyo.NonNegativeReals,
+                                                       initialize=initialize_F)
+param_estimation_problem.global_model.pfr1.dFdz = dae.DerivativeVar(param_estimation_problem.global_model.pfr1.F,
+                                                                    wrt=param_estimation_problem.global_model.pfr1.z)
 Out_flow_pfr1 = Flow(101, 101, 'OutFlow_pfr1')
 param_estimation_problem.global_model.pfr1.initial_flow_constraint = pyo.ConstraintList()
 for c in Out_flow_pfr1.comp_dict:
-    Out_flow_pfr1.comp_dict[c] = param_estimation_problem.global_model.pfr1.F[c, param_estimation_problem.global_model.pfr1.z.last()]
+    Out_flow_pfr1.comp_dict[c] = param_estimation_problem.global_model.pfr1.F[
+        c, param_estimation_problem.global_model.pfr1.z.last()]
     param_estimation_problem.global_model.pfr1.initial_flow_constraint.add(
         spliter.split_Out_flow_list[1].comp_dict[c]['mole_flow'] == param_estimation_problem.global_model.pfr1.F[c, 0])
 
-param_estimation_problem.global_model.pfr1.dpn = pyo.Expression(param_estimation_problem.global_model.pfr1.z, rule=pfr1_model.compute_dpn)
-param_estimation_problem.global_model.pfr1.V_flow = pyo.Expression(param_estimation_problem.global_model.pfr1.z, rule=pfr1_model.volume_flow_rate_rule)
-param_estimation_problem.global_model.pfr1.C = pyo.Expression(component_index, param_estimation_problem.global_model.pfr1.z, rule=pfr1_model.concentration_rule)
-param_estimation_problem.global_model.pfr1.mass_balance = pyo.Constraint(component_index, param_estimation_problem.global_model.pfr1.z, rule=pfr1_model.mass_balance)
+param_estimation_problem.global_model.pfr1.dpn = pyo.Expression(param_estimation_problem.global_model.pfr1.z,
+                                                                rule=pfr1_model.compute_dpn)
+param_estimation_problem.global_model.pfr1.V_flow = pyo.Expression(param_estimation_problem.global_model.pfr1.z,
+                                                                   rule=pfr1_model.volume_flow_rate_rule)
+param_estimation_problem.global_model.pfr1.C = pyo.Expression(component_index,
+                                                              param_estimation_problem.global_model.pfr1.z,
+                                                              rule=pfr1_model.concentration_rule)
+param_estimation_problem.global_model.pfr1.mass_balance = pyo.Constraint(component_index,
+                                                                         param_estimation_problem.global_model.pfr1.z,
+                                                                         rule=pfr1_model.mass_balance)
 
 discretizer = pyo.TransformationFactory('dae.finite_difference')
-discretizer.apply_to(param_estimation_problem.global_model.pfr1, nfe=20, scheme='BACKWARD')
+discretizer.apply_to(param_estimation_problem.global_model.pfr1, nfe=40, scheme='BACKWARD')
+
+# param_estimation_problem.global_model.pfr2 = pyo.Block()
 #
+# pfr2_model = PFRSingleliqPhase(t=198, p=101325, l=6.014, D=0.1837, inflow=spliter.split_Out_flow_list[2],
+#                                rx_set=reaction_set_1, prop=properties_package)
+#
+#
+# def initialize_F2(model, comp, z):
+#     if z == 0:
+#         return pfr2_model.Inflow.comp_dict[comp]['mole_flow']
+#     else:
+#         return pfr2_model.Inflow.comp_dict[comp]['mole_flow']
+#
+#
+# param_estimation_problem.global_model.pfr2.z = dae.ContinuousSet(bounds=(0, pfr2_model.Length))
+# param_estimation_problem.global_model.pfr2.F = pyo.Var(component_index, param_estimation_problem.global_model.pfr2.z,
+#                                                        domain=pyo.NonNegativeReals,
+#                                                        initialize=initialize_F2)
+# param_estimation_problem.global_model.pfr2.dFdz = dae.DerivativeVar(param_estimation_problem.global_model.pfr2.F,
+#                                                                     wrt=param_estimation_problem.global_model.pfr2.z)
+# Out_flow_pfr2 = Flow(101, 101, 'OutFlow_pfr2')
+# param_estimation_problem.global_model.pfr2.initial_flow_constraint = pyo.ConstraintList()
+# for c in Out_flow_pfr2.comp_dict:
+#     Out_flow_pfr2.comp_dict[c] = param_estimation_problem.global_model.pfr2.F[
+#         c, param_estimation_problem.global_model.pfr2.z.last()]
+#     param_estimation_problem.global_model.pfr2.initial_flow_constraint.add(
+#         spliter.split_Out_flow_list[2].comp_dict[c]['mole_flow'] == param_estimation_problem.global_model.pfr2.F[c, 0])
+#
+# param_estimation_problem.global_model.pfr2.dpn = pyo.Expression(param_estimation_problem.global_model.pfr2.z,
+#                                                                 rule=pfr2_model.compute_dpn)
+# param_estimation_problem.global_model.pfr2.V_flow = pyo.Expression(param_estimation_problem.global_model.pfr2.z,
+#                                                                    rule=pfr2_model.volume_flow_rate_rule)
+# param_estimation_problem.global_model.pfr2.C = pyo.Expression(component_index,
+#                                                               param_estimation_problem.global_model.pfr2.z,
+#                                                               rule=pfr2_model.concentration_rule)
+# param_estimation_problem.global_model.pfr2.mass_balance = pyo.Constraint(component_index,
+#                                                                          param_estimation_problem.global_model.pfr2.z,
+#                                                                          rule=pfr2_model.mass_balance)
+#
+# discretizer2 = pyo.TransformationFactory('dae.finite_difference')
+# discretizer2.apply_to(param_estimation_problem.global_model.pfr2, nfe=20, scheme='BACKWARD')
+#
+# param_estimation_problem.global_model.pfr3 = pyo.Block()
+#
+# pfr3_model = PFRSingleliqPhase(t=198, p=101325, l=6.014, D= 0.12245611, inflow=spliter.split_Out_flow_list[3],
+#                                rx_set=reaction_set_1, prop=properties_package)
+#
+#
+# def initialize_F3(model, comp, z):
+#     if z == 0:
+#         return pfr3_model.Inflow.comp_dict[comp]['mole_flow']
+#     else:
+#         return pfr3_model.Inflow.comp_dict[comp]['mole_flow']
+#
+#
+# param_estimation_problem.global_model.pfr3.z = dae.ContinuousSet(bounds=(0, pfr3_model.Length))
+# param_estimation_problem.global_model.pfr3.F = pyo.Var(component_index, param_estimation_problem.global_model.pfr3.z,
+#                                                        domain=pyo.NonNegativeReals,
+#                                                        initialize=initialize_F3)
+# param_estimation_problem.global_model.pfr3.dFdz = dae.DerivativeVar(param_estimation_problem.global_model.pfr3.F,
+#                                                                     wrt=param_estimation_problem.global_model.pfr3.z)
+# Out_flow_pfr3 = Flow(101, 101, 'OutFlow_pfr3')
+# param_estimation_problem.global_model.pfr3.initial_flow_constraint = pyo.ConstraintList()
+# for c in Out_flow_pfr3.comp_dict:
+#     Out_flow_pfr3.comp_dict[c] = param_estimation_problem.global_model.pfr3.F[
+#         c, param_estimation_problem.global_model.pfr3.z.last()]
+#     param_estimation_problem.global_model.pfr3.initial_flow_constraint.add(
+#         spliter.split_Out_flow_list[3].comp_dict[c]['mole_flow'] == param_estimation_problem.global_model.pfr3.F[c, 0])
+#
+# param_estimation_problem.global_model.pfr3.dpn = pyo.Expression(param_estimation_problem.global_model.pfr3.z,
+#                                                                 rule=pfr3_model.compute_dpn)
+# param_estimation_problem.global_model.pfr3.V_flow = pyo.Expression(param_estimation_problem.global_model.pfr3.z,
+#                                                                    rule=pfr3_model.volume_flow_rate_rule)
+# param_estimation_problem.global_model.pfr3.C = pyo.Expression(component_index,
+#                                                               param_estimation_problem.global_model.pfr3.z,
+#                                                               rule=pfr3_model.concentration_rule)
+# param_estimation_problem.global_model.pfr3.mass_balance = pyo.Constraint(component_index,
+#                                                                          param_estimation_problem.global_model.pfr3.z,
+#                                                                          rule=pfr3_model.mass_balance)
+#
+# discretizer3 = pyo.TransformationFactory('dae.finite_difference')
+# discretizer3.apply_to(param_estimation_problem.global_model.pfr3, nfe=40, scheme='BACKWARD')
+#
+# param_estimation_problem.global_model.pfr4 = pyo.Block()
+#
+# pfr4_model = PFRSingleliqPhase(t=198, p=101325, l=6.014, D=0.12246347, inflow=spliter.split_Out_flow_list[4],
+#                                rx_set=reaction_set_1, prop=properties_package)
+#
+#
+# def initialize_F4(model, comp, z):
+#     if z == 0:
+#         return pfr4_model.Inflow.comp_dict[comp]['mole_flow']
+#     else:
+#         return pfr4_model.Inflow.comp_dict[comp]['mole_flow']
+#
+#
+# param_estimation_problem.global_model.pfr4.z = dae.ContinuousSet(bounds=(0, pfr4_model.Length))
+# param_estimation_problem.global_model.pfr4.F = pyo.Var(component_index, param_estimation_problem.global_model.pfr4.z,
+#                                                        domain=pyo.NonNegativeReals,
+#                                                        initialize=initialize_F4)
+# param_estimation_problem.global_model.pfr4.dFdz = dae.DerivativeVar(param_estimation_problem.global_model.pfr4.F,
+#                                                                     wrt=param_estimation_problem.global_model.pfr4.z)
+# Out_flow_pfr4 = Flow(101, 101, 'OutFlow_pfr4')
+# param_estimation_problem.global_model.pfr4.initial_flow_constraint = pyo.ConstraintList()
+# for c in Out_flow_pfr4.comp_dict:
+#     Out_flow_pfr4.comp_dict[c] = param_estimation_problem.global_model.pfr4.F[
+#         c, param_estimation_problem.global_model.pfr4.z.last()]
+#     param_estimation_problem.global_model.pfr4.initial_flow_constraint.add(
+#         spliter.split_Out_flow_list[4].comp_dict[c]['mole_flow'] == param_estimation_problem.global_model.pfr4.F[c, 0])
+#
+# param_estimation_problem.global_model.pfr4.dpn = pyo.Expression(param_estimation_problem.global_model.pfr4.z,
+#                                                                 rule=pfr2_model.compute_dpn)
+# param_estimation_problem.global_model.pfr4.V_flow = pyo.Expression(param_estimation_problem.global_model.pfr4.z,
+#                                                                    rule=pfr2_model.volume_flow_rate_rule)
+# param_estimation_problem.global_model.pfr4.C = pyo.Expression(component_index,
+#                                                               param_estimation_problem.global_model.pfr4.z,
+#                                                               rule=pfr4_model.concentration_rule)
+# param_estimation_problem.global_model.pfr4.mass_balance = pyo.Constraint(component_index,
+#                                                                          param_estimation_problem.global_model.pfr4.z,
+#                                                                          rule=pfr4_model.mass_balance)
+#
+# discretizer4 = pyo.TransformationFactory('dae.finite_difference')
+# discretizer4.apply_to(param_estimation_problem.global_model.pfr4, nfe=40, scheme='BACKWARD')
+
+return_flow = Flow(101, 101, 'return')
+# for c in return_flow.comp_dict:
+#     return_flow.comp_dict[c]['mole_flow'] = param_estimation_problem.global_model.pfr1.F[
+#                                                 c, param_estimation_problem.global_model.pfr1.z.last()] + \
+#                                             param_estimation_problem.global_model.pfr2.F[
+#                                                 c, param_estimation_problem.global_model.pfr2.z.last()] + \
+#                                             param_estimation_problem.global_model.pfr3.F[
+#                                                 c, param_estimation_problem.global_model.pfr3.z.last()] + \
+#                                             param_estimation_problem.global_model.pfr4.F[
+#                                                 c, param_estimation_problem.global_model.pfr4.z.last()]
+
+for c in return_flow.comp_dict:
+    return_flow.comp_dict[c]['mole_flow'] = param_estimation_problem.global_model.pfr1.F[
+        c, param_estimation_problem.global_model.pfr1.z.last()]
+param_estimation_problem.global_model.tear_constrain = pyo.ConstraintList()
+
+for c in component_index:
+    param_estimation_problem.global_model.tear_constrain.add(
+        param_estimation_problem.global_model.tear_flow[c] == return_flow.comp_dict[c]["mole_flow"])
+
+# param_estimation_problem.Obj = pyo.ObjectiveList()
+param_estimation_problem.Obj = pyo.Objective(expr=((spliter.split_Out_flow_list[0].comp_dict['IB']["mole_flow"] / (
+        spliter.split_Out_flow_list[0].comp_dict['IB']["mole_flow"] +
+        spliter.split_Out_flow_list[0].comp_dict['CH3CL']["mole_flow"]) - 0.03) ** 2 + 0 * ((
+                                                                                                    spliter.split_Out_flow_list[
+                                                                                                        0].comp_dict[
+                                                                                                        'first_mom_live[1]'][
+                                                                                                        "mole_flow"] +
+                                                                                                    spliter.split_Out_flow_list[
+                                                                                                        0].comp_dict[
+                                                                                                        'first_mom_dead[1]'][
+                                                                                                        "mole_flow"]) / (
+                                                                                                    spliter.split_Out_flow_list[
+                                                                                                        0].comp_dict[
+                                                                                                        'zeroth_mom_live[1]'][
+                                                                                                        "mole_flow"] +
+                                                                                                    spliter.split_Out_flow_list[
+                                                                                                        0].comp_dict[
+                                                                                                        'zeroth_mom_dead[1]'][
+                                                                                                        "mole_flow"]) * 56 - 96000) ** 2),
+                                             sense=minimize)
+# param_estimation_problem.Obj.add(pyo.Objective(expr=((param_estimation_problem.global_model.reactor_4.outflow['first_mom_live[1]']+param_estimation_problem.global_model.reactor_4.outflow['first_mom_dead[1]'])/(param_estimation_problem.global_model.reactor_4.outflow['zeroth_mom_live[1]']+param_estimation_problem.global_model.reactor_4.outflow['zeroth_mom_dead[1]'])*56-96000)**2,sense=pyo.minimize))
 solver = SolverFactory('ipopt')
 solver.solve(param_estimation_problem, tee=True)
 
 for c in component_index:
     print(f"{c}:" + str(pyo.value(param_estimation_problem.global_model.pfr1.F[c, 0])))
 
+for c in param_estimation_problem.estimated_param.keys():
+    print(f"{c}:" + str(pyo.value(param_estimation_problem.estimated_param[c])))
+
     # print(pyo.value(spliter.split_Out_flow_list[0][c]))
 print(pyo.value(spliter.split_Out_flow_list[1].comp_dict['IB']['mole_flow']))
-print(str(pyo.value(global_model.reactor_1.outflow['IB'])))
-print(str(pyo.value(global_model.reactor_2.outflow['IB'])))
-print(str(pyo.value(global_model.reactor_3.outflow['IB'])))
-print(str(pyo.value(global_model.reactor_4.outflow['IB'])))
-plt.plot(pyo.value(global_model.pfr1.F['IB', :]))
-plt.show()
+print(str(pyo.value(param_estimation_problem.global_model.reactor_1.outflow['IB'])))
+print(str(pyo.value(param_estimation_problem.global_model.reactor_2.outflow['IB'])))
+# print(str(pyo.value(param_estimation_problem.global_model.reactor_3.outflow['IB'])))
+print("反应器4出口IB：" + str(pyo.value(spliter.split_Out_flow_list[0].comp_dict['IB']["mole_flow"])))
+print("反应器4出口CH3CL：" + str(pyo.value(spliter.split_Out_flow_list[0].comp_dict['CH3CL']["mole_flow"])))
+print("反应器4出口mwn：" + str((pyo.value(
+    spliter.split_Out_flow_list[0].comp_dict['first_mom_live[1]']['mole_flow']) + pyo.value(
+    spliter.split_Out_flow_list[0].comp_dict['first_mom_dead[1]']['mole_flow'])) / (pyo.value(
+    spliter.split_Out_flow_list[0].comp_dict['zeroth_mom_live[1]']['mole_flow']) + pyo.value(
+    spliter.split_Out_flow_list[0].comp_dict['zeroth_mom_dead[1]']['mole_flow'])) * 56))
+print("反应器4出口mww：" + str((pyo.value(
+    spliter.split_Out_flow_list[0].comp_dict['second_mom_live[1]']['mole_flow']) + pyo.value(
+    spliter.split_Out_flow_list[0].comp_dict['second_mom_dead[1]']['mole_flow'])) / (pyo.value(
+    spliter.split_Out_flow_list[0].comp_dict['first_mom_live[1]']['mole_flow']) + pyo.value(
+    spliter.split_Out_flow_list[0].comp_dict['first_mom_dead[1]']['mole_flow'])) * 56))
