@@ -53,20 +53,19 @@ class ReactorModel_PFR:
         comp_names = [c.name for c in GlobalComponentManager.component_list]
         self.model.comps = pyo.Set(initialize=comp_names)
 
-
         def initialize_F(model, comp, z):
             if z == 0:
-                return self.inlet_flow.comp_dict[comp]['mole_flow']+1e-32
+                return self.inlet_flow.comp_dict[comp]['mole_flow'] + 1e-32
             else:
-                return self.inlet_flow.comp_dict[comp]['mole_flow']+1e-32
-        self.model.F = pyo.Var(self.model.comps, self.model.z, domain=pyo.NonNegativeReals,initialize=initialize_F)
+                return self.inlet_flow.comp_dict[comp]['mole_flow'] + 1e-32
+
+        self.model.F = pyo.Var(self.model.comps, self.model.z, domain=pyo.NonNegativeReals, initialize=initialize_F)
         self.model.dFdz = dae.DerivativeVar(self.model.F, wrt=self.model.z)
 
         self.model.initial_flow_constraint = pyo.ConstraintList()
         for c in self.outlet_flow.comp_dict:
             self.outlet_flow.comp_dict[c]['mole_flow'] = pyo.value(self.model.F[c, self.model.z.last()])
         for comp in self.model.comps:
-
             self.model.initial_flow_constraint.add(
                 self.model.F[comp, 0] == self.inlet_flow.comp_dict[comp]['mole_flow'])
 
@@ -123,13 +122,12 @@ class ReactorModel_PFR:
             self.reactor.PropertiesMethod.param.m[-1] = pc_ftr_polymer * pyo.value(self.model.dpn[z]) * \
                                                         self.reactor.PropertiesMethod.param.MW[-1]
 
-
             vm_liq = self.reactor.PropertiesMethod.calculate_molar_density_mixture(self.reactor.Temperature,
                                                                                    self.reactor.Pressure,
                                                                                    self.reactor.PropertiesMethod.param,
                                                                                    mole_frac_properties,
                                                                                    mole_frac_properties[-1],
-                                                                                   self.model.dpn[z])/1000
+                                                                                   self.model.dpn[z]) / 1000
 
             return vm_liq
 
@@ -147,8 +145,6 @@ class ReactorModel_PFR:
         results = solver.solve(self.model, tee=False)
         if (results.solver.status == pyo.SolverStatus.ok) and (
                 results.solver.termination_condition == pyo.TerminationCondition.optimal):
-
-
 
             return {name: pyo.value(self.model.F[name, self.model.z.last()]) for name in self.model.comps}
         else:
@@ -170,7 +166,7 @@ class SolverManager:
                 # Update inlet flow of current model with outlet flow of previous model
                 for c in model.inlet_flow.comp_dict:
                     model.inlet_flow.comp_dict[c]['mole_flow'] = results[-1]['outflows'][c]
-                #model.setup_model()  # Reinitialize the model with new inlet conditions
+                # model.setup_model()  # Reinitialize the model with new inlet conditions
 
             model_results = model.solve(self.solver)
             results.append({'name': model.name, 'outflows': model_results, 'inlet_flow': model.inlet_flow})

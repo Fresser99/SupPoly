@@ -29,6 +29,6 @@ class Spliter:
 
         for flow_idx, flow in enumerate(self.split_Out_flow_list):
             for comp in self.inlet_flow.comp_dict:
-                flow.comp_dict[comp]['mole_flow'] = pyo.value(self.inlet_flow.comp_dict[comp]['mole_flow']) * \
+                flow.comp_dict[comp]['mole_flow'] = self.inlet_flow.comp_dict[comp]['mole_flow']* \
                                                     self.split_frac[
                                                         flow_idx]

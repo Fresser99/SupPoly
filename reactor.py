@@ -73,7 +73,6 @@ class CstrSingleLiqPhase:
         concentration = np.array([Outflow.comp_dict[c]['mole_flow'] / q_out for c in Outflow.comp_dict])
 
         for f in self.Inflow.comp_dict:
-            #print(f + ": " + str(pyo.value(self.ReactionSet.calculate_rate(f, concentration)) * self.Volume * 3600))
             eq = self.Inflow.comp_dict[f]['mole_flow'] - Outflow.comp_dict[f][
                 'mole_flow'] + self.ReactionSet.calculate_rate(f,
                                                                concentration) * self.Volume * 3600
@@ -93,7 +92,71 @@ class PFRSingleliqPhase:
         self.Area = D
         self.Length = l
 
+    def compute_dpn(self, model, z):
+        polymer_zeroth_mole_flow = sum(
+            model.F[c, z] if self.Inflow.comp_dict[c]['polymer_flow_momentum'] == 0 else 0.0 for c in
+            self.Inflow.comp_dict)
+
+        polymer_first_mole_flow = sum(
+            model.F[c, z] if self.Inflow.comp_dict[c]['polymer_flow_momentum'] == 1 else 0.0 for c in
+            self.Inflow.comp_dict)
+
+        mole_flow_zeroth = sum(
+            model.F[c, z] if self.Inflow.comp_dict[c]['polymer_flow_momentum'] in [0, -2] else 0.0 for c in
+            self.Inflow.comp_dict)
+
+        mole_flow_first = sum(
+            model.F[c, z] if self.Inflow.comp_dict[c]['polymer_flow_momentum'] in [1, -2] else 0.0 for c in
+            self.Inflow.comp_dict)
+
+        return polymer_first_mole_flow / polymer_zeroth_mole_flow
+
+    def volume_flow_rate_rule(self, model, z):
+
+        polymer_zeroth_mole_flow = np.array(
+            [pyo.value(model.F[c, z]) if self.Inflow.comp_dict[c]['polymer_flow_momentum'] == 0 else 0.0
+             for c in
+             self.Inflow.comp_dict])
+
+        mole_flow_zeroth = np.array([pyo.value(model.F[c, z]) if self.Inflow.comp_dict[c][
+                                                                     'polymer_flow_momentum'] in [0,
+                                                                                                  -2] else 0.0
+                                     for c in
+                                     self.Inflow.comp_dict])
+
+        mole_flow_first = [
+            pyo.value(model.F[c, z]) if self.Inflow.comp_dict[c]['polymer_flow_momentum'] in [1,
+                                                                                              -2] else 0.0
+            for c in
+            self.Inflow.comp_dict]
+
+        c_idx_list = []
+        for c_idx, comp in enumerate(GlobalComponentManager.component_list):
+            if type(comp) is Component:
+                c_idx_list.append(c_idx)
+
+        mole_flow_properties = np.append(mole_flow_zeroth[c_idx_list], np.sum(polymer_zeroth_mole_flow))
+        mole_frac_properties = mole_flow_properties / np.sum(mole_flow_properties)
+
+        pc_ftr_polymer = self.PropertiesMethod.param.r[-1]
+
+        self.PropertiesMethod.param.m[-1] = pc_ftr_polymer * pyo.value(model.dpn[z]) * \
+                                            self.PropertiesMethod.param.MW[-1]
+
+        vm_liq = self.PropertiesMethod.calculate_molar_density_mixture(self.Temperature,
+                                                                       self.Pressure,
+                                                                       self.PropertiesMethod.param,
+                                                                       mole_frac_properties,
+                                                                       mole_frac_properties[-1],
+                                                                       model.dpn[z]) / 1000
+
+        return vm_liq
+
+    def concentration_rule(self, model, comp, z):
+        return model.F[comp, z] / model.V_flow[z]
+
     def mass_balance(self, model, comp, z):
-        concentrations = [model.C[c, z] for c in model.comps]
+
+        concentrations = [model.F[c.name, z] / model.V_flow[z] for c in GlobalComponentManager.component_list]
         rate = self.ReactionSet.calculate_rate(comp, concentrations)
         return model.dFdz[comp, z] == rate * self.Area * 3600
