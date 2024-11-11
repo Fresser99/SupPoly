@@ -1,3 +1,5 @@
+import math
+
 import pyomo.environ as pyo
 import numpy as np
 import pandas as pd
@@ -32,7 +34,7 @@ class DeconvolutionHelper:
             param_name.append('s' + str(cite))
             param_name.append('mu' + str(cite))
         initial_guess = {
-            'A0': max(self.Y), 'A1': max(self.Y)/2, 'A2': max(self.Y)/3,
+            'A0': max(self.Y), 'A1': max(self.Y) , 'A2': max(self.Y) ,
             'mu0': 0.,
             'mu1': 0.,
             'mu2': 0.,
@@ -41,11 +43,13 @@ class DeconvolutionHelper:
         model.param = pyo.Var(param_name, initialize=initial_guess, domain=pyo.Reals)
 
         model.constraints = pyo.ConstraintList()
+        model.constraints.add(model.param['A0'] >= 0.0)
+        model.constraints.add(model.param['A1'] >= 0.0)
+        model.constraints.add(model.param['A2'] >= 0.0)
+
         for i in range(self.site_num):
-            model.constraints.add(model.param['A0'] >= 0.0)
-            model.constraints.add(model.param['A1'] >= 0.0)
-            model.constraints.add(model.param['A2'] >= 0.0)
-            model.constraints.add(model.param['A0']+model.param['A1']+model.param['A2'] == 1)
+
+
             model.constraints.add(model.param['s' + str(i)] >= 0)
             model.constraints.add(model.param['mu' + str(i)] >= min(self.MW))
             model.constraints.add(model.param['mu' + str(i)] <= max(self.MW))
@@ -59,16 +63,14 @@ class DeconvolutionHelper:
         model.obj = pyo.Objective(rule=object_func, sense=pyo.minimize)
         solver = SolverFactory('ipopt')
         results = solver.solve(model, tee=True)
-        peak1 = [pyo.value(model.param['A0']) * pyo.exp(
-            -(self.MW[i] - pyo.value(model.param['mu0'])) ** 2 / (pyo.value(model.param['s0']) ** 2)) for i in
-                 range(len(self.MW))]
+        peak1 = np.array([pyo.value(i) for i in self.gaussian(model, 0)])
         # peak1 = np.array(self.gaussian(model,0))
         # np.savetxt('fff.txt',peak1)
         peak2 = np.array([pyo.value(i) for i in self.gaussian(model, 1)])
         peak3 = np.array([pyo.value(i) for i in self.gaussian(model, 2)])
         # print([pyo.value(i) for i in self.gaussian(model, 0)])
         plt.plot(peak1 + peak2 + peak3)
-        plt.plot(self.Y,'*')
+        plt.plot(self.Y, '*')
         plt.plot(peak1)
         plt.plot(peak2)
         plt.plot(peak3)
@@ -76,12 +78,13 @@ class DeconvolutionHelper:
         # plt.plot(peak3)
         plt.show()
         print([pyo.value(model.param['A' + str(i)]) for i in range(self.site_num)])
-        print([pyo.value(model.param['mu' + str(i)]) for i in range(self.site_num)])
+        print([10 ** pyo.value(model.param['mu' + str(i)]) for i in range(self.site_num)])
         print([pyo.value(model.param['s' + str(i)]) for i in range(self.site_num)])
-
+        print([10**(pyo.value(model.param['s' + str(i)])**2) for i in range(self.site_num)])
+        print([pyo.value(model.param['A' + str(i)])/sum([pyo.value(model.param['A' + str(i)]) for i in range(self.site_num)]) for i in range(self.site_num)])
     def gaussian(self, model, site_idx):
 
-        a = [model.param['A' + str(site_idx)] * pyo.exp(
+        a = [model.param['A' + str(site_idx)]/(self.MW[i]*model.param['s' + str(site_idx)]*np.sqrt(2*np.pi)) * pyo.exp(
             -(self.MW[i] - model.param['mu' + str(site_idx)]) ** 2 / (
                     2 * model.param['s' + str(site_idx)] ** 2)) for i in range(len(self.MW))]
         return a
