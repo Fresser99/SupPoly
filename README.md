@@ -1,6 +1,4 @@
 ![丁基橡胶聚合反应器机理模型开发说明文档_46](https://github.com/user-attachments/assets/79ab2c32-da22-4352-abd7-1b0b277f3366)
-
-![丁基橡胶聚合反应器机理模型开发说明文档_47](https://github.com/user-attachments/assets/5a6f8ea1-2c62-484d-8d78-510863534823)
 ![丁基橡胶聚合反应器机理模型开发说明文档_48](https://github.com/user-attachments/assets/b0129fb7-fe28-4a47-b703-70bcea3ff484)
 ![丁基橡胶聚合反应器机理模型开发说明文档_49](https://github.com/user-attachments/assets/f4197fd4-1dfa-47ae-84d9-84a2a6173efb)
 ![丁基橡胶聚合反应器机理模型开发说明文档_50](https://github.com/user-attachments/assets/9fbc9659-71ae-4c85-9c50-437223f591f9)
